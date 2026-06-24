@@ -29,7 +29,10 @@ class SendRichMessage:
     async def send_rich_message(
         self: "pyrogram.Client",
         chat_id: Union[int, str],
-        rich_message: "types.InputRichMessage",
+        html: Optional[str] = None,
+        markdown: Optional[str] = None,
+        is_rtl: Optional[bool] = None,
+        skip_entity_detection: Optional[bool] = None,
         disable_notification: Optional[bool] = None,
         message_thread_id: Optional[int] = None,
         direct_messages_topic_id: Optional[int] = None,
@@ -58,8 +61,20 @@ class SendRichMessage:
                 For your personal cloud (Saved Messages) you can simply use "me" or "self".
                 For a contact that exists in your Telegram address book you can use his phone number (str).
 
-            rich_message (:obj:`~pyrogram.types.InputRichMessage`):
-                The message to be sent.
+            html (``str``, *optional*):
+                Content of the rich message to send described using HTML formatting.
+                See `rich message formatting options <https://core.telegram.org/bots/api#rich-message-formatting-options>`__ for more details.
+
+            markdown (``str``, *optional*):
+                Content of the rich message to send described using Markdown formatting.
+                See `rich message formatting options <https://core.telegram.org/bots/api#rich-message-formatting-options>`__ for more details.
+
+            is_rtl (``bool``, *optional*):
+                Pass *True* if the rich message must be shown right-to-left.
+
+            skip_entity_detection (``bool``, *optional*):
+                Pass *True* to skip automatic detection of entities
+                (e.g., URLs, email addresses, username mentions, hashtags, cashtags, bot commands, or phone numbers) in the text.
 
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
@@ -105,19 +120,30 @@ class SendRichMessage:
         Example:
             .. code-block:: python
 
-                from pyrogram import types
+                # Rich HTML
+                await app.send_rich_message(
+                    "me",
+                    html="<h1>Title</h1><p>Hello <b>World</b></p>"
+                )
+
+                # Rich Markdown with inline keyboard
+                from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
                 await app.send_rich_message(
-                    chat_id=chat_id,
-                    rich_message=types.InputRichMessage(html="Hello <b>World</b>"),
-                    reply_markup=types.InlineKeyboardMarkup(
-                        [
-                            [types.InlineKeyboardButton("Data", callback_data="callback_data")],
-                            [types.InlineKeyboardButton("Docs", url="https://docs.pyrogram.org")],
-                        ]
-                    ),
+                    "me",
+                    markdown="# Title\\n\\nHello **World**",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("Click", callback_data="click")]]
+                    )
                 )
         """
+        rich_message = types.InputRichMessage(
+            html=html,
+            markdown=markdown,
+            is_rtl=is_rtl,
+            skip_entity_detection=skip_entity_detection,
+        )
+
         r = await self.invoke(
             raw.functions.messages.SendMessage(
                 peer=await self.resolve_peer(chat_id),

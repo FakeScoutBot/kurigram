@@ -34,10 +34,13 @@ class EditMessageText:
         text: Optional[str] = None,
         parse_mode: Optional["enums.ParseMode"] = None,
         entities: Optional[List["types.MessageEntity"]] = None,
+        html: Optional[str] = None,
+        markdown: Optional[str] = None,
+        is_rtl: Optional[bool] = None,
+        skip_entity_detection: Optional[bool] = None,
         link_preview_options: "types.LinkPreviewOptions" = None,
         schedule_date: Optional[datetime] = None,
         business_connection_id: Optional[str] = None,
-        rich_message: Optional["types.InputRichMessage"] = None,
         reply_markup: "types.InlineKeyboardMarkup" = None,
         show_caption_above_media: Optional[bool] = None,
         disable_web_page_preview: Optional[bool] = None,
@@ -57,7 +60,7 @@ class EditMessageText:
 
             text (``str``, *optional*):
                 New text of the message.
-                Required if rich_message isn't specified.
+                Required if html/markdown isn't specified.
 
             parse_mode (:obj:`~pyrogram.enums.ParseMode`, *optional*):
                 By default, texts are parsed using both Markdown and HTML styles.
@@ -65,6 +68,23 @@ class EditMessageText:
 
             entities (List of :obj:`~pyrogram.types.MessageEntity`, *optional*):
                 List of special entities that appear in message text, which can be specified instead of *parse_mode*.
+
+            html (``str``, *optional*):
+                New rich content of the message described using HTML formatting.
+                Required if text/markdown isn't specified.
+                See `rich message formatting options <https://core.telegram.org/bots/api#rich-message-formatting-options>`__ for more details.
+
+            markdown (``str``, *optional*):
+                New rich content of the message described using Markdown formatting.
+                Required if text/html isn't specified.
+                See `rich message formatting options <https://core.telegram.org/bots/api#rich-message-formatting-options>`__ for more details.
+
+            is_rtl (``bool``, *optional*):
+                Pass *True* if the rich message must be shown right-to-left.
+
+            skip_entity_detection (``bool``, *optional*):
+                Pass *True* to skip automatic detection of entities
+                (e.g., URLs, email addresses, username mentions, hashtags, cashtags, bot commands, or phone numbers) in the text.
 
             link_preview_options (:obj:`~pyrogram.types.LinkPreviewOptions`, *optional*):
                 Options used for link preview generation for the message.
@@ -74,10 +94,6 @@ class EditMessageText:
 
             business_connection_id (``str``, *optional*):
                 Unique identifier of the business connection on behalf of which the message will be sent.
-
-            rich_message (:obj:`~pyrogram.types.InputRichMessage`, *optional*):
-                New rich content of the message.
-                Required if text isn't specified.
 
             reply_markup (:obj:`~pyrogram.types.InlineKeyboardMarkup`, *optional*):
                 An InlineKeyboardMarkup object.
@@ -97,6 +113,18 @@ class EditMessageText:
                 await app.edit_message_text(
                     chat_id, message_id, message.text,
                     link_preview_options=types.LinkPreviewOptions(is_disabled=True))
+
+                # Edit message into rich HTML
+                await app.edit_message_text(
+                    chat_id, message_id,
+                    html="<h1>Title</h1><p>Hello <b>World</b></p>"
+                )
+
+                # Edit message into rich Markdown
+                await app.edit_message_text(
+                    chat_id, message_id,
+                    markdown="# Title\\n\\nHello **World**"
+                )
         """
         if any(
             (
@@ -128,10 +156,15 @@ class EditMessageText:
             message, entities = (
                 await utils.parse_text_entities(self, text, parse_mode, entities)
             ).values()
-        elif rich_message:
-            input_rich_message = rich_message.write()
+        elif html or markdown:
+            input_rich_message = types.InputRichMessage(
+                html=html,
+                markdown=markdown,
+                is_rtl=is_rtl,
+                skip_entity_detection=skip_entity_detection,
+            ).write()
         else:
-            raise ValueError("Either text or rich_message must be specified")
+            raise ValueError("Either text, html or markdown must be specified")
 
         r = await self.invoke(
             raw.functions.messages.EditMessage(

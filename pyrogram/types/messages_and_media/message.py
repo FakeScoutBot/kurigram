@@ -4615,6 +4615,140 @@ class Message(Object, Update):
 
     reply_text = reply
 
+    async def reply_rich(
+        self,
+        html: Optional[str] = None,
+        markdown: Optional[str] = None,
+        is_rtl: Optional[bool] = None,
+        skip_entity_detection: Optional[bool] = None,
+        disable_notification: Optional[bool] = None,
+        message_thread_id: Optional[int] = None,
+        direct_messages_topic_id: Optional[int] = None,
+        effect_id: Optional[int] = None,
+        reply_parameters: Optional["types.ReplyParameters"] = None,
+        protect_content: Optional[bool] = None,
+        allow_paid_broadcast: Optional[bool] = None,
+        suggested_post_parameters: Optional["types.SuggestedPostParameters"] = None,
+        reply_markup: Optional[
+            Union[
+                "types.InlineKeyboardMarkup",
+                "types.ReplyKeyboardMarkup",
+                "types.ReplyKeyboardRemove",
+                "types.ForceReply"
+            ]
+        ] = None,
+
+        quote: Optional[bool] = None,
+    ) -> "Message":
+        """Shortcut for method :obj:`~pyrogram.Client.send_rich_message` will automatically fill method attributes:
+
+        * chat_id
+        * message_thread_id
+        * direct_messages_topic_id
+        * business_connection_id
+        * reply_parameters
+
+        Parameters:
+            html (``str``, *optional*):
+                Content of the rich message to send described using HTML formatting.
+                See `rich message formatting options <https://core.telegram.org/bots/api#rich-message-formatting-options>`__ for more details.
+
+            markdown (``str``, *optional*):
+                Content of the rich message to send described using Markdown formatting.
+                See `rich message formatting options <https://core.telegram.org/bots/api#rich-message-formatting-options>`__ for more details.
+
+            is_rtl (``bool``, *optional*):
+                Pass *True* if the rich message must be shown right-to-left.
+
+            skip_entity_detection (``bool``, *optional*):
+                Pass *True* to skip automatic detection of entities
+                (e.g., URLs, email addresses, username mentions, hashtags, cashtags, bot commands, or phone numbers) in the text.
+
+            disable_notification (``bool``, *optional*):
+                Sends the message silently.
+                Users will receive a notification with no sound.
+
+            message_thread_id (``int``, *optional*):
+                Unique identifier of a message thread to which the message belongs.
+                For forums only.
+
+            direct_messages_topic_id (``int``, *optional*):
+                Unique identifier of the topic in a channel direct messages chat administered by the current user.
+                For directs only.
+
+            effect_id (``int``, *optional*):
+                Unique identifier of the message effect.
+                For private chats only.
+
+            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
+                Describes reply parameters for the message that is being sent.
+
+            protect_content (``bool``, *optional*):
+                Protects the contents of the sent message from forwarding and saving.
+
+            allow_paid_broadcast (``bool``, *optional*):
+                If True, you will be allowed to send up to 1000 messages per second.
+                Ignoring broadcasting limits for a fee of 0.1 Telegram Stars per message.
+                The relevant Stars will be withdrawn from the bot's balance.
+                For bots only.
+
+            suggested_post_parameters (:obj:`~pyrogram.types.SuggestedPostParameters`, *optional*):
+                Information about the suggested post.
+
+            reply_markup (:obj:`~pyrogram.types.InlineKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardRemove` | :obj:`~pyrogram.types.ForceReply`, *optional*):
+                Additional interface options. An object for an inline keyboard, custom reply keyboard,
+                instructions to remove reply keyboard or to force a reply from the user.
+
+        Returns:
+            :obj:`~pyrogram.types.Message`: On success, the sent message is returned.
+
+        Raises:
+            RPCError: In case of a Telegram RPC error.
+
+        Example:
+            .. code-block:: python
+
+                await message.reply_rich(html="<h1>Title</h1><p>Hello <b>World</b></p>")
+                await message.reply_rich(markdown="# Title\\n\\nHello **World**")
+        """
+        if reply_parameters is None:
+            reply_parameters = types.ReplyParameters(
+                message_id=self.id
+            )
+
+        if quote is not None:
+            log.warning(
+                "`quote` parameter is deprecated and will be removed in future updates."
+            )
+            quote = self.chat.type != enums.ChatType.PRIVATE
+
+            if not quote:
+                reply_parameters = None
+
+        if message_thread_id is None:
+            message_thread_id = self.message_thread_id
+
+        if direct_messages_topic_id is None:
+            direct_messages_topic_id = self.direct_messages_topic_id
+
+        return await self._client.send_rich_message(
+            chat_id=self.chat.id,
+            html=html,
+            markdown=markdown,
+            is_rtl=is_rtl,
+            skip_entity_detection=skip_entity_detection,
+            disable_notification=disable_notification,
+            message_thread_id=message_thread_id,
+            direct_messages_topic_id=direct_messages_topic_id,
+            effect_id=effect_id,
+            reply_parameters=reply_parameters,
+            protect_content=protect_content,
+            business_connection_id=self.business_connection_id,
+            allow_paid_broadcast=allow_paid_broadcast,
+            suggested_post_parameters=suggested_post_parameters,
+            reply_markup=reply_markup,
+        )
+
     async def answer(
         self,
         text: str,
@@ -8323,9 +8457,13 @@ class Message(Object, Update):
 
     async def edit_text(
         self,
-        text: str,
+        text: Optional[str] = None,
         parse_mode: Optional["enums.ParseMode"] = None,
         entities: Optional[List["types.MessageEntity"]] = None,
+        html: Optional[str] = None,
+        markdown: Optional[str] = None,
+        is_rtl: Optional[bool] = None,
+        skip_entity_detection: Optional[bool] = None,
         link_preview_options: Optional["types.LinkPreviewOptions"] = None,
         reply_markup: Optional["types.InlineKeyboardMarkup"] = None,
 
@@ -8342,10 +8480,13 @@ class Message(Object, Update):
             .. code-block:: python
 
                 await message.edit_text("hello")
+                await message.edit_text(html="<h1>Title</h1><p>Hello <b>World</b></p>")
+                await message.edit_text(markdown="# Title\\n\\nHello **World**")
 
         Parameters:
-            text (``str``):
+            text (``str``, *optional*):
                 New text of the message.
+                Required if html/markdown isn't specified.
 
             parse_mode (:obj:`~pyrogram.enums.ParseMode`, *optional*):
                 By default, texts are parsed using both Markdown and HTML styles.
@@ -8353,6 +8494,21 @@ class Message(Object, Update):
 
             entities (List of :obj:`~pyrogram.types.MessageEntity`):
                 List of special entities that appear in message text, which can be specified instead of *parse_mode*.
+
+            html (``str``, *optional*):
+                New rich content of the message described using HTML formatting.
+                Required if text/markdown isn't specified.
+
+            markdown (``str``, *optional*):
+                New rich content of the message described using Markdown formatting.
+                Required if text/html isn't specified.
+
+            is_rtl (``bool``, *optional*):
+                Pass *True* if the rich message must be shown right-to-left.
+
+            skip_entity_detection (``bool``, *optional*):
+                Pass *True* to skip automatic detection of entities
+                (e.g., URLs, email addresses, username mentions, hashtags, cashtags, bot commands, or phone numbers) in the text.
 
             link_preview_options (:obj:`~pyrogram.types.LinkPreviewOptions`, *optional*):
                 Options used for link preview generation for the message.
@@ -8372,6 +8528,10 @@ class Message(Object, Update):
             text=text,
             parse_mode=parse_mode,
             entities=entities,
+            html=html,
+            markdown=markdown,
+            is_rtl=is_rtl,
+            skip_entity_detection=skip_entity_detection,
             link_preview_options=link_preview_options,
             business_connection_id=self.business_connection_id,
             reply_markup=reply_markup,
