@@ -43,7 +43,6 @@ class InputRichMessageContent(InputMessageContent):
         self.rich_message = rich_message
 
     async def write(self, client: "pyrogram.Client", reply_markup):
-
         return raw.types.InputBotInlineMessageRichMessage(
             rich_message=self.rich_message.write(),
             reply_markup=await reply_markup.write(client) if reply_markup else None,
