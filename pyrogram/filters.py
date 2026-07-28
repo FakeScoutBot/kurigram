@@ -992,7 +992,21 @@ ephemeral = create(lambda _, __, m: m.ephemeral_message_id is not None)
 # endregion
 
 # region command_filter
-def command(commands: Union[str, List[str]], prefixes: Optional[Union[str, List[str]]] = "/", case_sensitive: bool = False):
+class _NotSet:
+    def __repr__(self):
+        return "<default client prefixes>"
+
+
+COMMAND_PREFIX_NOT_SET = _NotSet()
+"""Sentinel used by :func:`~pyrogram.filters.command` to detect that *prefixes* was not
+explicitly passed, so the filter should fall back to the ``Client(prefixes=...)`` value."""
+
+
+def command(
+    commands: Union[str, List[str]],
+    prefixes: Optional[Union[str, List[str]]] = COMMAND_PREFIX_NOT_SET,
+    case_sensitive: bool = False
+):
     """Filter commands, i.e.: text messages starting with "/" or any other custom prefix.
 
     Parameters:
@@ -1004,7 +1018,9 @@ def command(commands: Union[str, List[str]], prefixes: Optional[Union[str, List[
 
         prefixes (``str`` | ``list``, *optional*):
             A prefix or a list of prefixes as string the filter should look for.
-            Defaults to "/" (slash). Examples: ".", "!", ["/", "!", "."], list(".:!").
+            Defaults to the prefixes configured on the :obj:`~pyrogram.Client` (via the
+            ``prefixes`` parameter of :meth:`~pyrogram.Client`), which itself defaults to "/"
+            (slash) when not set. Examples: ".", "!", ["/", "!", "."], list(".:!").
             Pass None or "" (empty string) to allow commands with no prefix at all.
 
         case_sensitive (``bool``, *optional*):
@@ -1021,7 +1037,13 @@ def command(commands: Union[str, List[str]], prefixes: Optional[Union[str, List[
         if not text:
             return False
 
-        for prefix in flt.prefixes:
+        prefixes = flt.prefixes
+
+        if prefixes is COMMAND_PREFIX_NOT_SET:
+            client_prefixes = getattr(client, "prefixes", None)
+            prefixes = client_prefixes if client_prefixes else {"/"}
+
+        for prefix in prefixes:
             if not text.startswith(prefix):
                 continue
 
@@ -1035,10 +1057,6 @@ def command(commands: Union[str, List[str]], prefixes: Optional[Union[str, List[
                 without_command = re.sub(rf"{cmd}(?:@?{username})?\s?", "", without_prefix, count=1,
                                          flags=re.IGNORECASE if not flt.case_sensitive else 0)
 
-                # match.groups are 1-indexed, group(1) is the quote, group(2) is the text
-                # between the quotes, group(3) is unquoted, whitespace-split text
-
-                # Remove the escape character from the arguments
                 message.command = [cmd] + [
                     re.sub(r"\\([\"'])", r"\1", m.group(2) or m.group(3) or "")
                     for m in command_re.finditer(without_command)
@@ -1051,9 +1069,12 @@ def command(commands: Union[str, List[str]], prefixes: Optional[Union[str, List[
     commands = commands if isinstance(commands, list) else [commands]
     commands = {c if case_sensitive else c.lower() for c in commands}
 
-    prefixes = [] if prefixes is None else prefixes
-    prefixes = prefixes if isinstance(prefixes, list) else [prefixes]
-    prefixes = set(prefixes) if prefixes else {""}
+    if prefixes is COMMAND_PREFIX_NOT_SET:
+        prefixes = COMMAND_PREFIX_NOT_SET
+    else:
+        prefixes = [] if prefixes is None else prefixes
+        prefixes = prefixes if isinstance(prefixes, list) else [prefixes]
+        prefixes = set(prefixes) if prefixes else {""}
 
     return create(
         func,

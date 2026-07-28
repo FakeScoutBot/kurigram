@@ -222,6 +222,12 @@ class Client(Methods):
 
         link_preview_options (:obj:`~pyrogram.types.LinkPreviewOptions`, *optional*):
             Global link preview options for the client.
+            
+        prefixes (``str`` | ``list``, *optional*):
+            Global command prefix or list of prefixes for the client, used as the default by
+            :func:`~pyrogram.filters.command` whenever a handler doesn't pass its own
+            ``prefixes`` argument. Defaults to "/" (slash). Examples: "!", ["/", "!", "."].
+            Pass None or "" (empty string) to allow commands with no prefix at all by default.
 
         fetch_replies (``bool``, *optional*):
             Pass True to automatically fetch replies for messages.
@@ -310,6 +316,7 @@ class Client(Methods):
         storage_engine: Optional[Storage] = None,
         client_platform: "enums.ClientPlatform" = enums.ClientPlatform.OTHER,
         link_preview_options: Optional[LinkPreviewOptions] = None,
+        prefixes: Optional[Union[str, List[str]]] = "/",
         fetch_replies: Optional[bool] = True,
         fetch_topics: Optional[bool] = True,
         fetch_stories: Optional[bool] = True,
@@ -353,6 +360,10 @@ class Client(Methods):
         self.max_topic_cache_size = max_topic_cache_size
         self.client_platform = client_platform
         self.link_preview_options = link_preview_options
+        
+        _prefixes = [] if prefixes is None else prefixes
+        _prefixes = _prefixes if isinstance(_prefixes, list) else [_prefixes]
+        self.prefixes = set(_prefixes) if _prefixes else {""}
         self.fetch_replies = fetch_replies
         self.fetch_topics = fetch_topics
         self.fetch_stories = fetch_stories
