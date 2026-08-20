@@ -33,7 +33,7 @@ from importlib import import_module
 from io import BytesIO, StringIO
 from mimetypes import MimeTypes
 from pathlib import Path
-from typing import AsyncGenerator, Callable, List, Optional, Type, Union
+from typing import AsyncIterator, Callable, List, Optional, Type, Union
 
 import pyrogram
 from pyrogram import __license__, __version__, enums, raw, utils
@@ -1129,9 +1129,9 @@ class Client(Methods):
         file_size: int = 0,
         limit: int = 0,
         offset: int = 0,
-        progress: Callable = None,
+        progress: Optional[Callable] = None,
         progress_args: tuple = ()
-    ) -> AsyncGenerator[bytes, None]:
+    ) -> AsyncIterator[bytes]:
         async with self.get_file_semaphore:
             file_type = file_id.file_type
 
@@ -1155,7 +1155,10 @@ class Client(Methods):
                 location = raw.types.InputPeerPhotoFileLocation(
                     peer=peer,
                     photo_id=file_id.media_id,
-                    big=file_id.thumbnail_source == ThumbnailSource.CHAT_PHOTO_BIG
+                    big=file_id.thumbnail_source in (
+                        ThumbnailSource.CHAT_PHOTO_BIG,
+                        ThumbnailSource.CHAT_PHOTO_BIG_LEGACY
+                    )
                 )
             elif file_type == FileType.PHOTO:
                 location = raw.types.InputPhotoFileLocation(
@@ -1439,7 +1442,7 @@ class Client(Methods):
 
     async def get_dc_option(
         self,
-        dc_id: int = None,
+        dc_id: Optional[int] = None,
         is_media: bool = False,
         is_cdn: bool = False,
         ipv6: bool = False
