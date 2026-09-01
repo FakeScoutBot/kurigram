@@ -876,6 +876,7 @@ def pyrogram_api():
             ChecklistTasksAdded
             ChecklistTasksDone
             CommunityChatAdded
+            CommunityChatJoined
             CommunityChatRemoved
             Checklist
             RefundedPayment
@@ -899,6 +900,7 @@ def pyrogram_api():
             PaidMessagesPriceChanged
             DirectMessagePriceChanged
             DirectMessagesTopic
+            EphemeralMessageParameters
             PaymentForm
             PaymentOption
             SavedCredentials
@@ -918,7 +920,7 @@ def pyrogram_api():
             ChatBackground
             ChatTheme
             GiftedStars
-            GiftedTon
+            GiftedGrams
             UpgradedGiftValueInfo
             UpgradedGiftAttributeId
             UpgradedGiftPurchaseOffer
@@ -973,12 +975,15 @@ def pyrogram_api():
             PreCheckoutQuery
             ShippingAddress
             ShippingQuery
+            SwitchInlineQueryChosenChat
             MessageReactionUpdated
             MessageReactionCountUpdated
             ChatBoostUpdated
             ShippingOption
             PurchasedPaidMedia
             ChatShared
+            DisabledButton
+            CopyTextButton
             UsersShared
         """,
         bot_commands="""

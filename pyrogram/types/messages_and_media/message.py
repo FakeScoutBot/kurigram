@@ -119,8 +119,10 @@ class Message(Object, Update):
         from_offline (``bool``, *optional*):
             True, if the message was sent by an implicit action, for example, as an away or a greeting business message, or as a scheduled message.
 
-        topic (:obj:`~pyrogram.types.ForumTopic`, *optional*):
+        topic (:obj:`~pyrogram.types.ForumTopic` | :obj:`~pyrogram.types.DirectMessagesTopic`, *optional*):
             Topic the message belongs to.
+            A :obj:`~pyrogram.types.ForumTopic` in a forum, a :obj:`~pyrogram.types.DirectMessagesTopic` in a channel
+            direct messages chat.
 
         forward_origin (:obj:`~pyrogram.types.MessageOrigin`, *optional*):
             Information about the original message for forwarded messages.
@@ -448,10 +450,13 @@ class Message(Object, Update):
             Service message: checklist tasks added.
 
         community_chat_added (:obj:`~pyrogram.types.CommunityChatAdded`, *optional*):
-            Service message: chat added to a Community.
+            Service message: chat added to a :obj:`~pyrogram.types.Community`.
 
         community_chat_removed (:obj:`~pyrogram.types.CommunityChatRemoved`, *optional*):
-            Service message: chat removed from a Community.
+            Service message: chat removed from a :obj:`~pyrogram.types.Community`.
+
+        community_chat_joined (:obj:`~pyrogram.types.CommunityChatJoined`, *optional*):
+            Service message: chat was joined by a user from a :obj:`~pyrogram.types.Community`.
 
         premium_gift_code (:obj:`~pyrogram.types.PremiumGiftCode`, *optional*):
             Service message: premium gift code information.
@@ -462,8 +467,8 @@ class Message(Object, Update):
         gifted_stars (:obj:`~pyrogram.types.GiftedStars`, *optional*):
             Service message: gifted stars information.
 
-        gifted_ton (:obj:`~pyrogram.types.GiftedTon`, *optional*):
-            Service message: gifted ton information.
+        gifted_grams (:obj:`~pyrogram.types.GiftedGrams`, *optional*):
+            Service message: gifted TON Grams information.
 
         gift (:obj:`~pyrogram.types.Gift`, *optional*):
             Service message: star gift information.
@@ -652,7 +657,7 @@ class Message(Object, Update):
         show_caption_above_media: Optional[bool] = None,
         external_reply: Optional["types.ExternalReplyInfo"] = None,
         quote: Optional["types.TextQuote"] = None,
-        topic: Optional["types.ForumTopic"] = None,
+        topic: Optional[Union["types.ForumTopic", "types.DirectMessagesTopic"]] = None,
         forward_origin: Optional["types.MessageOrigin"] = None,
         message_thread_id: Optional[int] = None,
         direct_messages_topic_id: Optional[int] = None,
@@ -751,12 +756,13 @@ class Message(Object, Update):
         direct_message_price_changed: Optional["types.DirectMessagePriceChanged"] = None,
         checklist_tasks_done: Optional[List["types.ChecklistTasksDone"]] = None,
         checklist_tasks_added: Optional[List["types.ChecklistTasksAdded"]] = None,
-        community_chat_added: Optional[List["types.CommunityChatAdded"]] = None,
-        community_chat_removed: Optional[List["types.CommunityChatRemoved"]] = None,
+        community_chat_added: Optional["types.CommunityChatAdded"] = None,
+        community_chat_removed: Optional["types.CommunityChatRemoved"] = None,
+        community_chat_joined: Optional["types.CommunityChatJoined"] = None,
         premium_gift_code: Optional["types.PremiumGiftCode"] = None,
         gifted_premium: Optional["types.GiftedPremium"] = None,
         gifted_stars: Optional["types.GiftedStars"] = None,
-        gifted_ton: Optional["types.GiftedTon"] = None,
+        gifted_grams: Optional["types.GiftedGrams"] = None,
         gift: Optional["types.Gift"] = None,
         is_prepaid_upgrade: Optional[bool] = None,
         is_from_auction: Optional[bool] = None,
@@ -939,10 +945,11 @@ class Message(Object, Update):
         self.checklist_tasks_added = checklist_tasks_added
         self.community_chat_added = community_chat_added
         self.community_chat_removed = community_chat_removed
+        self.community_chat_joined = community_chat_joined
         self.premium_gift_code = premium_gift_code
         self.gifted_premium = gifted_premium
         self.gifted_stars = gifted_stars
-        self.gifted_ton = gifted_ton
+        self.gifted_grams = gifted_grams
         self.gift = gift
         self.is_prepaid_upgrade = is_prepaid_upgrade
         self.is_from_auction = is_from_auction
@@ -1039,7 +1046,7 @@ class Message(Object, Update):
         premium_gift_code = None
         gifted_premium = None
         gifted_stars = None
-        gifted_ton = None
+        gifted_grams = None
         giveaway_created = None
         giveaway_completed = None
         managed_bot_created = None
@@ -1089,6 +1096,7 @@ class Message(Object, Update):
         checklist_tasks_added = None
         community_chat_added = None
         community_chat_removed = None
+        community_chat_joined = None
 
         service_type = enums.MessageServiceType.UNSUPPORTED
 
@@ -1181,8 +1189,8 @@ class Message(Object, Update):
                 receiver=users.get(peer_id or from_id)
             )
         elif isinstance(action, raw.types.MessageActionGiftTon):
-            service_type = enums.MessageServiceType.GIFTED_TON
-            gifted_ton = await types.GiftedTon._parse(
+            service_type = enums.MessageServiceType.GIFTED_GRAMS
+            gifted_grams = await types.GiftedGrams._parse(
                 client,
                 action,
                 gifter=users.get(from_id),
@@ -1363,11 +1371,13 @@ class Message(Object, Update):
         elif isinstance(action, raw.types.MessageActionChangeCommunity):
             if action.community_id:
                 service_type = enums.MessageServiceType.COMMUNITY_CHAT_ADDED
-                community_chat_added = types.CommunityChatAdded._parse(client, action, chats)
+                community_chat_added = await types.CommunityChatAdded._parse(client, action, chats)
             else:
                 service_type = enums.MessageServiceType.COMMUNITY_CHAT_REMOVED
                 community_chat_removed = types.CommunityChatRemoved()
-
+        elif isinstance(action, raw.types.MessageActionChatJoinedViaCommunity):
+            service_type = enums.MessageServiceType.COMMUNITY_CHAT_JOINED
+            community_chat_joined = await types.CommunityChatJoined._parse(client, action, chats)
 
         parsed_message = Message(
             id=message.id,
@@ -1398,7 +1408,7 @@ class Message(Object, Update):
             premium_gift_code=premium_gift_code,
             gifted_premium=gifted_premium,
             gifted_stars=gifted_stars,
-            gifted_ton=gifted_ton,
+            gifted_grams=gifted_grams,
             giveaway_created=giveaway_created,
             giveaway_completed=giveaway_completed,
             managed_bot_created=managed_bot_created,
@@ -1446,6 +1456,7 @@ class Message(Object, Update):
             checklist_tasks_added=checklist_tasks_added,
             community_chat_added=community_chat_added,
             community_chat_removed=community_chat_removed,
+            community_chat_joined=community_chat_joined,
             reactions=await types.MessageReactions._parse(client, message.reactions, users, chats),
             business_connection_id=business_connection_id,
             raw=message,
@@ -1477,7 +1488,7 @@ class Message(Object, Update):
             parsed_message.service = enums.MessageServiceType.POLL_OPTION_DELETED
             parsed_message.poll_option_deleted = await types.PollOptionDeleted._parse(client, parsed_message.reply_to_message, action)
 
-        client.message_cache[(parsed_message.chat.id, parsed_message.id)] = parsed_message
+        await client.message_cache.set((parsed_message.chat.id, parsed_message.id), parsed_message)
 
         return parsed_message
 
@@ -1839,10 +1850,10 @@ class Message(Object, Update):
             )
 
             if parsed_message.topic:
-                client.topic_cache[(parsed_message.chat.id, parsed_message.topic.id)] = parsed_message.topic
+                await client.topic_cache.set((parsed_message.chat.id, parsed_message.topic.id), parsed_message.topic)
 
         if not parsed_message.topic and parsed_message.chat.is_forum:
-            parsed_topic = client.topic_cache[(parsed_message.chat.id, parsed_message.message_thread_id)]
+            parsed_topic = await client.topic_cache.get((parsed_message.chat.id, parsed_message.message_thread_id))
 
             if parsed_topic:
                 parsed_message.topic = parsed_topic
@@ -1854,14 +1865,14 @@ class Message(Object, Update):
                     )
 
                     if parsed_message.topic:
-                        client.topic_cache[(parsed_message.chat.id, parsed_message.topic.id)] = parsed_message.topic
+                        await client.topic_cache.set((parsed_message.chat.id, parsed_message.topic.id), parsed_message.topic)
                 except (ChannelPrivate, ChannelForumMissing):
                     pass
 
         if chat.type == enums.ChatType.DIRECT and message.saved_peer_id:
             parsed_message.direct_messages_topic_id = message.saved_peer_id.user_id
 
-            parsed_topic = client.topic_cache[(parsed_message.chat.id, parsed_message.direct_messages_topic_id)]
+            parsed_topic = await client.topic_cache.get((parsed_message.chat.id, parsed_message.direct_messages_topic_id))
 
             if parsed_topic:
                 parsed_message.topic = parsed_topic
@@ -1873,12 +1884,12 @@ class Message(Object, Update):
                     )
 
                     if parsed_message.topic:
-                        client.topic_cache[(parsed_message.chat.id, parsed_message.topic.id)] = parsed_message.topic
+                        await client.topic_cache.set((parsed_message.chat.id, parsed_message.topic.id), parsed_message.topic)
                 except (ChannelPrivate, ChatAdminRequired):
                     pass
 
         if not parsed_message.poll:  # Do not cache poll messages
-            client.message_cache[(parsed_message.chat.id, parsed_message.id)] = parsed_message
+            await client.message_cache.set((parsed_message.chat.id, parsed_message.id), parsed_message)
 
         return parsed_message
 
@@ -2160,7 +2171,7 @@ class Message(Object, Update):
             )
 
         if not parsed_message.topic and parsed_message.chat.is_forum:
-            parsed_topic = client.topic_cache[(parsed_message.chat.id, parsed_message.message_thread_id)]
+            parsed_topic = await client.topic_cache.get((parsed_message.chat.id, parsed_message.message_thread_id))
 
             if parsed_topic:
                 parsed_message.topic = parsed_topic
@@ -2172,12 +2183,12 @@ class Message(Object, Update):
                     )
 
                     if parsed_message.topic:
-                        client.topic_cache[(parsed_message.chat.id, parsed_message.topic.id)] = parsed_message.topic
+                        await client.topic_cache.set((parsed_message.chat.id, parsed_message.topic.id), parsed_message.topic)
                 except (ChannelPrivate, ChannelForumMissing):
                     pass
 
         if not parsed_message.poll:  # Do not cache poll messages
-            client.message_cache[(parsed_message.chat.id, parsed_message.id)] = parsed_message
+            await client.message_cache.set((parsed_message.chat.id, parsed_message.id), parsed_message)
 
         return parsed_message
 
@@ -2206,7 +2217,7 @@ class Message(Object, Update):
                     key = (parsed_message.chat.id, parsed_message.reply_to_message_id)
                     reply_to_params = {'chat_id': key[0], 'message_ids': message.id, 'reply': True}
 
-                parsed_message.reply_to_message = client.message_cache[key]
+                parsed_message.reply_to_message = await client.message_cache.get(key)
 
                 if raw_reply_to_message: # For business bots only
                     parsed_message.reply_to_message = await types.Message._parse(
@@ -2424,21 +2435,12 @@ class Message(Object, Update):
                 "types.ForceReply"
             ]
         ] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
         repeat_period: Optional[int] = None,
         progress: Optional[Callable] = None,
         progress_args: tuple = (),
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_animation` will automatically fill method attributes:
 
@@ -2447,7 +2449,7 @@ class Message(Object, Update):
         * direct_messages_topic_id
         * business_connection_id
         * reply_parameters
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             animation (``str``):
@@ -2491,29 +2493,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
@@ -2566,29 +2548,16 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            if self.ephemeral_message_id:
-                reply_parameters = types.ReplyParameters(
-                    ephemeral_message_id=self.ephemeral_message_id
-                )
-                receiver_user_id = receiver_user_id or self.from_user.id
-            else:
-                reply_parameters = types.ReplyParameters(message_id=self.id)
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
+        if self.ephemeral_message_id:
+            reply_parameters = types.ReplyParameters(
+                ephemeral_message_id=self.ephemeral_message_id
             )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
+            ephemeral_message_parameters = types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+        else:
+            reply_parameters = types.ReplyParameters(message_id=self.id)
+            ephemeral_message_parameters = None
 
         return await self._client.send_animation(
             chat_id=self.chat.id,
@@ -2603,10 +2572,9 @@ class Message(Object, Update):
             height=height,
             thumb=thumb,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=ephemeral_message_parameters,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -2618,10 +2586,6 @@ class Message(Object, Update):
             reply_markup=reply_markup,
             progress=progress,
             progress_args=progress_args,
-
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            quote_entities=quote_entities,
         )
 
     async def answer_animation(
@@ -2648,10 +2612,6 @@ class Message(Object, Update):
                 "types.ForceReply"
             ]
         ] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
@@ -2665,7 +2625,7 @@ class Message(Object, Update):
         * message_thread_id
         * direct_messages_topic_id
         * business_connection_id
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             animation (``str``):
@@ -2709,23 +2669,6 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
@@ -2784,15 +2727,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if self.ephemeral_message_id and receiver_user_id is None:
-            receiver_user_id = self.from_user.id
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_animation(
             chat_id=self.chat.id,
             animation=animation,
@@ -2806,10 +2740,13 @@ class Message(Object, Update):
             height=height,
             thumb=thumb,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+            if self.ephemeral_message_id
+            else None,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -2834,12 +2771,7 @@ class Message(Object, Update):
         title: Optional[str] = None,
         thumb: Optional[Union[str, BinaryIO]] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
         repeat_period: Optional[int] = None,
         allow_paid_broadcast: Optional[bool] = None,
@@ -2855,11 +2787,6 @@ class Message(Object, Update):
         ] = None,
         progress: Optional[Callable] = None,
         progress_args: tuple = (),
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_audio` will automatically fill method attributes:
 
@@ -2868,7 +2795,7 @@ class Message(Object, Update):
         * direct_messages_topic_id
         * business_connection_id
         * reply_parameters
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             audio (``str``):
@@ -2906,29 +2833,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
@@ -2981,29 +2888,16 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            if self.ephemeral_message_id:
-                reply_parameters = types.ReplyParameters(
-                    ephemeral_message_id=self.ephemeral_message_id
-                )
-                receiver_user_id = receiver_user_id or self.from_user.id
-            else:
-                reply_parameters = types.ReplyParameters(message_id=self.id)
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
+        if self.ephemeral_message_id:
+            reply_parameters = types.ReplyParameters(
+                ephemeral_message_id=self.ephemeral_message_id
             )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
+            ephemeral_message_parameters = types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+        else:
+            reply_parameters = types.ReplyParameters(message_id=self.id)
+            ephemeral_message_parameters = None
 
         return await self._client.send_audio(
             chat_id=self.chat.id,
@@ -3016,10 +2910,9 @@ class Message(Object, Update):
             title=title,
             thumb=thumb,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=ephemeral_message_parameters,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -3031,10 +2924,6 @@ class Message(Object, Update):
             reply_markup=reply_markup,
             progress=progress,
             progress_args=progress_args,
-
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            quote_entities=quote_entities,
         )
 
     async def answer_audio(
@@ -3048,10 +2937,6 @@ class Message(Object, Update):
         title: Optional[str] = None,
         thumb: Optional[Union[str, BinaryIO]] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
@@ -3076,7 +2961,7 @@ class Message(Object, Update):
         * message_thread_id
         * direct_messages_topic_id
         * business_connection_id
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             audio (``str``):
@@ -3113,23 +2998,6 @@ class Message(Object, Update):
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
                 Users will receive a notification with no sound.
-
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
 
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
@@ -3189,15 +3057,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if self.ephemeral_message_id and receiver_user_id is None:
-            receiver_user_id = self.from_user.id
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_audio(
             chat_id=self.chat.id,
             audio=audio,
@@ -3209,10 +3068,13 @@ class Message(Object, Update):
             title=title,
             thumb=thumb,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+            if self.ephemeral_message_id
+            else None,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -3233,12 +3095,7 @@ class Message(Object, Update):
         last_name: str = "",
         vcard: str = "",
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: Optional[bool] = None,
         paid_message_star_count: Optional[int] = None,
         reply_markup: Optional[
@@ -3249,12 +3106,6 @@ class Message(Object, Update):
                 "types.ForceReply"
             ]
         ] = None,
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_contact` will automatically fill method attributes:
 
@@ -3263,7 +3114,7 @@ class Message(Object, Update):
         * direct_messages_topic_id
         * business_connection_id
         * reply_parameters
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             phone_number (``str``):
@@ -3282,29 +3133,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             allow_paid_broadcast (``bool``, *optional*):
                 If True, you will be allowed to send up to 1000 messages per second.
@@ -3326,29 +3157,16 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            if self.ephemeral_message_id:
-                reply_parameters = types.ReplyParameters(
-                    ephemeral_message_id=self.ephemeral_message_id
-                )
-                receiver_user_id = receiver_user_id or self.from_user.id
-            else:
-                reply_parameters = types.ReplyParameters(message_id=self.id)
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
+        if self.ephemeral_message_id:
+            reply_parameters = types.ReplyParameters(
+                ephemeral_message_id=self.ephemeral_message_id
             )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
+            ephemeral_message_parameters = types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+        else:
+            reply_parameters = types.ReplyParameters(message_id=self.id)
+            ephemeral_message_parameters = None
 
         return await self._client.send_contact(
             chat_id=self.chat.id,
@@ -3357,21 +3175,15 @@ class Message(Object, Update):
             last_name=last_name,
             vcard=vcard,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=ephemeral_message_parameters,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             business_connection_id=self.business_connection_id,
             allow_paid_broadcast=allow_paid_broadcast,
             paid_message_star_count=paid_message_star_count,
             reply_markup=reply_markup,
-
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            parse_mode=parse_mode,
-            quote_entities=quote_entities,
         )
 
     async def answer_contact(
@@ -3381,10 +3193,6 @@ class Message(Object, Update):
         last_name: str = "",
         vcard: str = "",
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: Optional[bool] = None,
@@ -3404,7 +3212,7 @@ class Message(Object, Update):
         * message_thread_id
         * direct_messages_topic_id
         * business_connection_id
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             phone_number (``str``):
@@ -3422,23 +3230,6 @@ class Message(Object, Update):
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
                 Users will receive a notification with no sound.
-
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
 
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
@@ -3467,15 +3258,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if self.ephemeral_message_id and receiver_user_id is None:
-            receiver_user_id = self.from_user.id
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_contact(
             chat_id=self.chat.id,
             phone_number=phone_number,
@@ -3483,10 +3265,13 @@ class Message(Object, Update):
             last_name=last_name,
             vcard=vcard,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+            if self.ephemeral_message_id
+            else None,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             business_connection_id=self.business_connection_id,
@@ -3505,12 +3290,7 @@ class Message(Object, Update):
         file_name: Optional[str] = None,
         force_document: Optional[bool] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
         repeat_period: Optional[int] = None,
         protect_content: Optional[bool] = None,
@@ -3527,11 +3307,6 @@ class Message(Object, Update):
         ] = None,
         progress: Optional[Callable] = None,
         progress_args: tuple = (),
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_document` will automatically fill method attributes:
 
@@ -3540,7 +3315,7 @@ class Message(Object, Update):
         * direct_messages_topic_id
         * business_connection_id
         * reply_parameters
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             document (``str``):
@@ -3578,29 +3353,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
@@ -3656,29 +3411,16 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            if self.ephemeral_message_id:
-                reply_parameters = types.ReplyParameters(
-                    ephemeral_message_id=self.ephemeral_message_id
-                )
-                receiver_user_id = receiver_user_id or self.from_user.id
-            else:
-                reply_parameters = types.ReplyParameters(message_id=self.id)
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
+        if self.ephemeral_message_id:
+            reply_parameters = types.ReplyParameters(
+                ephemeral_message_id=self.ephemeral_message_id
             )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
+            ephemeral_message_parameters = types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+        else:
+            reply_parameters = types.ReplyParameters(message_id=self.id)
+            ephemeral_message_parameters = None
 
         return await self._client.send_document(
             chat_id=self.chat.id,
@@ -3690,10 +3432,9 @@ class Message(Object, Update):
             file_name=file_name,
             force_document=force_document,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=ephemeral_message_parameters,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -3706,10 +3447,6 @@ class Message(Object, Update):
             reply_markup=reply_markup,
             progress=progress,
             progress_args=progress_args,
-
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            quote_entities=quote_entities,
         )
 
     async def answer_document(
@@ -3722,10 +3459,6 @@ class Message(Object, Update):
         file_name: Optional[str] = None,
         force_document: Optional[bool] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
@@ -3751,7 +3484,7 @@ class Message(Object, Update):
         * message_thread_id
         * direct_messages_topic_id
         * business_connection_id
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             document (``str``):
@@ -3788,23 +3521,6 @@ class Message(Object, Update):
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
                 Users will receive a notification with no sound.
-
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
 
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
@@ -3867,15 +3583,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if self.ephemeral_message_id and receiver_user_id is None:
-            receiver_user_id = self.from_user.id
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_document(
             chat_id=self.chat.id,
             document=document,
@@ -3886,10 +3593,13 @@ class Message(Object, Update):
             file_name=file_name,
             force_document=force_document,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+            if self.ephemeral_message_id
+            else None,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -3908,9 +3618,7 @@ class Message(Object, Update):
         self,
         game_short_name: str,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
         effect_id: int = Optional[None],
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: Optional[bool] = None,
         reply_markup: Optional[
             Union[
@@ -3920,9 +3628,6 @@ class Message(Object, Update):
                 "types.ForceReply"
             ]
         ] = None,
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_game` will automatically fill method attributes:
 
@@ -3943,16 +3648,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For supergroups only.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             allow_paid_broadcast (``bool``, *optional*):
                 If True, you will be allowed to send up to 1000 messages per second.
@@ -3971,41 +3669,21 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            reply_parameters = types.ReplyParameters(
-                message_id=self.id
-            )
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
-            )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
         return await self._client.send_game(
             chat_id=self.chat.id,
             game_short_name=game_short_name,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
+            message_thread_id=self.message_thread_id,
             effect_id=effect_id,
-            reply_parameters=reply_parameters,
+            reply_parameters=types.ReplyParameters(message_id=self.id),
             allow_paid_broadcast=allow_paid_broadcast,
             reply_markup=reply_markup,
-
-            reply_to_message_id=reply_to_message_id,
         )
 
     async def answer_game(
         self,
         game_short_name: str,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
         effect_id: int = Optional[None],
         reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: Optional[bool] = None,
@@ -4064,14 +3742,11 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
         return await self._client.send_game(
             chat_id=self.chat.id,
             game_short_name=game_short_name,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
+            message_thread_id=self.message_thread_id,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             allow_paid_broadcast=allow_paid_broadcast,
@@ -4085,7 +3760,6 @@ class Message(Object, Update):
         payload: Union[str, bytes],
         currency: str,
         prices: List["types.LabeledPrice"],
-        message_thread_id: Optional[int] = None,
         provider_token: Optional[str] = None,
         max_tip_amount: Optional[int] = None,
         suggested_tip_amounts: Optional[List[int]] = None,
@@ -4105,9 +3779,7 @@ class Message(Object, Update):
         disable_notification: Optional[bool] = None,
         protect_content: Optional[bool] = None,
         message_effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: Optional[bool] = None,
-        direct_messages_topic_id: Optional[int] = None,
         suggested_post_parameters: Optional["types.SuggestedPostParameters"] = None,
         subscription_expiration_date: Optional[int] = None,
         reply_markup: Optional[
@@ -4145,12 +3817,6 @@ class Message(Object, Update):
             prices (List of :obj:`~pyrogram.types.LabeledPrice`):
                 Price breakdown, a JSON-serialized list of components (e.g. product price, tax, discount, delivery cost, delivery tax, bonus, etc.). Must contain exactly one item for payments in `Telegram Stars <https://t.me/BotNews/90>`_.
 
-            message_thread_id (``int``, *optional*):
-                If the message is in a thread, ID of the original message.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
-
             provider_token (``str``, *optional*):
                 Payment provider token, obtained via `@BotFather <https://t.me/botfather>`_. Pass an empty string for payments in `Telegram Stars <https://t.me/BotNews/90>`_.
 
@@ -4214,10 +3880,6 @@ class Message(Object, Update):
                 Ignoring broadcasting limits for a fee of 0.1 Telegram Stars per message.
                 The relevant Stars will be withdrawn from the bot's balance.
 
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.only.
-
             suggested_post_parameters (:obj:`~pyrogram.types.SuggestedPostParameters`, *optional*):
                 Information about the suggested post.
 
@@ -4244,17 +3906,6 @@ class Message(Object, Update):
             :obj:`~pyrogram.types.Message` | ``None``: On success, the sent invoice message is returned, otherwise, in
             case the server answered with no message, None is returned.
         """
-        if reply_parameters is None:
-            reply_parameters = types.ReplyParameters(
-                message_id=self.id
-            )
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_invoice(
             chat_id=self.chat.id,
             title=title,
@@ -4262,7 +3913,7 @@ class Message(Object, Update):
             payload=payload,
             currency=currency,
             prices=prices,
-            message_thread_id=message_thread_id,
+            message_thread_id=self.message_thread_id,
             provider_token=provider_token,
             max_tip_amount=max_tip_amount,
             suggested_tip_amounts=suggested_tip_amounts,
@@ -4282,9 +3933,9 @@ class Message(Object, Update):
             disable_notification=disable_notification,
             protect_content=protect_content,
             message_effect_id=message_effect_id,
-            reply_parameters=reply_parameters,
+            reply_parameters=types.ReplyParameters(message_id=self.id),
             allow_paid_broadcast=allow_paid_broadcast,
-            direct_messages_topic_id=direct_messages_topic_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
             suggested_post_parameters=suggested_post_parameters,
             subscription_expiration_date=subscription_expiration_date,
             reply_markup=reply_markup,
@@ -4300,7 +3951,6 @@ class Message(Object, Update):
         payload: Union[str, bytes],
         currency: str,
         prices: List["types.LabeledPrice"],
-        message_thread_id: Optional[int] = None,
         provider_token: Optional[str] = None,
         max_tip_amount: Optional[int] = None,
         suggested_tip_amounts: Optional[List[int]] = None,
@@ -4322,7 +3972,6 @@ class Message(Object, Update):
         message_effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: Optional[bool] = None,
-        direct_messages_topic_id: Optional[int] = None,
         suggested_post_parameters: Optional["types.SuggestedPostParameters"] = None,
         subscription_expiration_date: Optional[int] = None,
         reply_markup: Optional[
@@ -4359,9 +4008,6 @@ class Message(Object, Update):
             prices (List of :obj:`~pyrogram.types.LabeledPrice`):
                 Price breakdown, a JSON-serialized list of components (e.g. product price, tax, discount, delivery cost, delivery tax, bonus, etc.). Must contain exactly one item for payments in `Telegram Stars <https://t.me/BotNews/90>`_.
 
-            message_thread_id (``int``, *optional*):
-                If the message is in a thread, ID of the original message.
-
             reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
                 Describes reply parameters for the message that is being sent.
 
@@ -4428,10 +4074,6 @@ class Message(Object, Update):
                 Ignoring broadcasting limits for a fee of 0.1 Telegram Stars per message.
                 The relevant Stars will be withdrawn from the bot's balance.
 
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.only.
-
             suggested_post_parameters (:obj:`~pyrogram.types.SuggestedPostParameters`, *optional*):
                 Information about the suggested post.
 
@@ -4458,12 +4100,6 @@ class Message(Object, Update):
             :obj:`~pyrogram.types.Message` | ``None``: On success, the sent invoice message is returned, otherwise, in
             case the server answered with no message, None is returned.
         """
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_invoice(
             chat_id=self.chat.id,
             title=title,
@@ -4471,7 +4107,7 @@ class Message(Object, Update):
             payload=payload,
             currency=currency,
             prices=prices,
-            message_thread_id=message_thread_id,
+            message_thread_id=self.message_thread_id,
             provider_token=provider_token,
             max_tip_amount=max_tip_amount,
             suggested_tip_amounts=suggested_tip_amounts,
@@ -4493,7 +4129,7 @@ class Message(Object, Update):
             message_effect_id=message_effect_id,
             reply_parameters=reply_parameters,
             allow_paid_broadcast=allow_paid_broadcast,
-            direct_messages_topic_id=direct_messages_topic_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
             suggested_post_parameters=suggested_post_parameters,
             subscription_expiration_date=subscription_expiration_date,
             reply_markup=reply_markup,
@@ -4511,12 +4147,7 @@ class Message(Object, Update):
         heading: Optional[int] = None,
         proximity_alert_radius: Optional[int] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: Optional[bool] = None,
         paid_message_star_count: Optional[int] = None,
         reply_markup: Optional[
@@ -4527,11 +4158,6 @@ class Message(Object, Update):
                 "types.ForceReply"
             ]
         ] = None,
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_location` will automatically fill method attributes:
 
@@ -4540,7 +4166,7 @@ class Message(Object, Update):
         * direct_messages_topic_id
         * business_connection_id
         * reply_parameters
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             latitude (``float``):
@@ -4569,29 +4195,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             allow_paid_broadcast (``bool``, *optional*):
                 If True, you will be allowed to send up to 1000 messages per second.
@@ -4613,29 +4219,16 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            if self.ephemeral_message_id:
-                reply_parameters = types.ReplyParameters(
-                    ephemeral_message_id=self.ephemeral_message_id
-                )
-                receiver_user_id = receiver_user_id or self.from_user.id
-            else:
-                reply_parameters = types.ReplyParameters(message_id=self.id)
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
+        if self.ephemeral_message_id:
+            reply_parameters = types.ReplyParameters(
+                ephemeral_message_id=self.ephemeral_message_id
             )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
+            ephemeral_message_parameters = types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+        else:
+            reply_parameters = types.ReplyParameters(message_id=self.id)
+            ephemeral_message_parameters = None
 
         return await self._client.send_location(
             chat_id=self.chat.id,
@@ -4646,20 +4239,15 @@ class Message(Object, Update):
             heading=heading,
             proximity_alert_radius=proximity_alert_radius,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=ephemeral_message_parameters,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             business_connection_id=self.business_connection_id,
             allow_paid_broadcast=allow_paid_broadcast,
             paid_message_star_count=paid_message_star_count,
             reply_markup=reply_markup,
-
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            quote_entities=quote_entities,
         )
 
     async def answer_location(
@@ -4671,10 +4259,6 @@ class Message(Object, Update):
         heading: Optional[int] = None,
         proximity_alert_radius: Optional[int] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: Optional[bool] = None,
@@ -4694,7 +4278,7 @@ class Message(Object, Update):
         * message_thread_id
         * direct_messages_topic_id
         * business_connection_id
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             latitude (``float``):
@@ -4723,23 +4307,6 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
@@ -4767,15 +4334,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if self.ephemeral_message_id and receiver_user_id is None:
-            receiver_user_id = self.from_user.id
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_location(
             chat_id=self.chat.id,
             latitude=latitude,
@@ -4785,10 +4343,13 @@ class Message(Object, Update):
             heading=heading,
             proximity_alert_radius=proximity_alert_radius,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+            if self.ephemeral_message_id
+            else None,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             business_connection_id=self.business_connection_id,
@@ -4801,18 +4362,9 @@ class Message(Object, Update):
         self,
         media: List[Union["types.InputMediaPhoto", "types.InputMediaVideo"]],
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
         effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: Optional[bool] = None,
         paid_message_star_count: Optional[int] = None,
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> List["types.Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_media_group` will automatically fill method attributes:
 
@@ -4832,20 +4384,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             allow_paid_broadcast (``bool``, *optional*):
                 If True, you will be allowed to send up to 1000 messages per second.
@@ -4863,50 +4404,23 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            reply_parameters = types.ReplyParameters(
-                message_id=self.id
-            )
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
-            )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_media_group(
             chat_id=self.chat.id,
             media=media,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
             effect_id=effect_id,
-            reply_parameters=reply_parameters,
+            reply_parameters=types.ReplyParameters(message_id=self.id),
             allow_paid_broadcast=allow_paid_broadcast,
             paid_message_star_count=paid_message_star_count,
             business_connection_id=self.business_connection_id,
-
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            parse_mode=parse_mode,
-            quote_entities=quote_entities,
         )
 
     async def answer_media_group(
         self,
         media: List[Union["types.InputMediaPhoto", "types.InputMediaVideo"]],
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: Optional[bool] = None,
@@ -4929,14 +4443,6 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
@@ -4960,18 +4466,12 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_media_group(
             chat_id=self.chat.id,
             media=media,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             allow_paid_broadcast=allow_paid_broadcast,
@@ -4986,13 +4486,7 @@ class Message(Object, Update):
         entities: Optional[List["types.MessageEntity"]] = None,
         link_preview_options: Optional["types.LinkPreviewOptions"] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
-        show_caption_above_media: Optional[bool] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
         repeat_period: Optional[int] = None,
         protect_content: Optional[bool] = None,
@@ -5007,12 +4501,6 @@ class Message(Object, Update):
                 "types.ForceReply"
             ]
         ] = None,
-
-        quote: Optional[bool] = None,
-        disable_web_page_preview: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_message` will automatically fill method attributes:
 
@@ -5021,7 +4509,7 @@ class Message(Object, Update):
         * direct_messages_topic_id
         * business_connection_id
         * reply_parameters
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             text (``str``):
@@ -5041,32 +4529,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            show_caption_above_media (``bool``, *optional*):
-                Pass True, if the caption must be shown above the message media.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
@@ -5100,29 +4565,16 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            if self.ephemeral_message_id:
-                reply_parameters = types.ReplyParameters(
-                    ephemeral_message_id=self.ephemeral_message_id
-                )
-                receiver_user_id = receiver_user_id or self.from_user.id
-            else:
-                reply_parameters = types.ReplyParameters(message_id=self.id)
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
+        if self.ephemeral_message_id:
+            reply_parameters = types.ReplyParameters(
+                ephemeral_message_id=self.ephemeral_message_id
             )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
+            ephemeral_message_parameters = types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+        else:
+            reply_parameters = types.ReplyParameters(message_id=self.id)
+            ephemeral_message_parameters = None
 
         return await self._client.send_message(
             chat_id=self.chat.id,
@@ -5131,12 +4583,10 @@ class Message(Object, Update):
             entities=entities,
             link_preview_options=link_preview_options,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=ephemeral_message_parameters,
             effect_id=effect_id,
-            show_caption_above_media=show_caption_above_media,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
             repeat_period=repeat_period,
@@ -5146,11 +4596,6 @@ class Message(Object, Update):
             paid_message_star_count=paid_message_star_count,
             suggested_post_parameters=suggested_post_parameters,
             reply_markup=reply_markup,
-
-            disable_web_page_preview=disable_web_page_preview,
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            quote_entities=quote_entities,
         )
 
     reply_text = reply
@@ -5162,12 +4607,7 @@ class Message(Object, Update):
         entities: Optional[List["types.MessageEntity"]] = None,
         link_preview_options: Optional["types.LinkPreviewOptions"] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
-        show_caption_above_media: Optional[bool] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
         repeat_period: Optional[int] = None,
@@ -5190,7 +4630,7 @@ class Message(Object, Update):
         * message_thread_id
         * direct_messages_topic_id
         * business_connection_id
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             text (``str``):
@@ -5210,29 +4650,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            show_caption_above_media (``bool``, *optional*):
-                Pass True, if the caption must be shown above the message media.
 
             reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
                 Describes reply parameters for the message that is being sent.
@@ -5269,15 +4689,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if self.ephemeral_message_id and receiver_user_id is None:
-            receiver_user_id = self.from_user.id
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_message(
             chat_id=self.chat.id,
             text=text,
@@ -5285,12 +4696,14 @@ class Message(Object, Update):
             entities=entities,
             link_preview_options=link_preview_options,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+            if self.ephemeral_message_id
+            else None,
             effect_id=effect_id,
-            show_caption_above_media=show_caption_above_media,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
             repeat_period=repeat_period,
@@ -5299,7 +4712,7 @@ class Message(Object, Update):
             allow_paid_broadcast=allow_paid_broadcast,
             paid_message_star_count=paid_message_star_count,
             suggested_post_parameters=suggested_post_parameters,
-            reply_markup=reply_markup
+            reply_markup=reply_markup,
         )
 
     async def reply_photo(
@@ -5312,12 +4725,7 @@ class Message(Object, Update):
         show_caption_above_media: Optional[bool] = None,
         ttl_seconds: Optional[int] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
         repeat_period: Optional[int] = None,
         view_once: Optional[bool] = None,
@@ -5335,11 +4743,6 @@ class Message(Object, Update):
         ] = None,
         progress: Optional[Callable] = None,
         progress_args: tuple = (),
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_photo` will automatically fill method attributes:
 
@@ -5348,6 +4751,7 @@ class Message(Object, Update):
         * direct_messages_topic_id
         * business_connection_id
         * reply_parameters
+        * ephemeral_message_parameters
 
         Parameters:
             photo (``str``):
@@ -5381,29 +4785,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
@@ -5463,29 +4847,16 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            if self.ephemeral_message_id:
-                reply_parameters = types.ReplyParameters(
-                    ephemeral_message_id=self.ephemeral_message_id
-                )
-                receiver_user_id = receiver_user_id or self.from_user.id
-            else:
-                reply_parameters = types.ReplyParameters(message_id=self.id)
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
+        if self.ephemeral_message_id:
+            reply_parameters = types.ReplyParameters(
+                ephemeral_message_id=self.ephemeral_message_id
             )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
+            ephemeral_message_parameters = types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+        else:
+            reply_parameters = types.ReplyParameters(message_id=self.id)
+            ephemeral_message_parameters = None
 
         return await self._client.send_photo(
             chat_id=self.chat.id,
@@ -5497,10 +4868,9 @@ class Message(Object, Update):
             show_caption_above_media=show_caption_above_media,
             ttl_seconds=ttl_seconds,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=ephemeral_message_parameters,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -5513,11 +4883,7 @@ class Message(Object, Update):
             suggested_post_parameters=suggested_post_parameters,
             reply_markup=reply_markup,
             progress=progress,
-            progress_args=progress_args,
-
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            quote_entities=quote_entities,
+            progress_args=progress_args
         )
 
     async def answer_photo(
@@ -5530,10 +4896,6 @@ class Message(Object, Update):
         show_caption_above_media: Optional[bool] = None,
         ttl_seconds: Optional[int] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
@@ -5560,7 +4922,7 @@ class Message(Object, Update):
         * message_thread_id
         * direct_messages_topic_id
         * business_connection_id
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             photo (``str``):
@@ -5593,23 +4955,6 @@ class Message(Object, Update):
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
                 Users will receive a notification with no sound.
-
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
 
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
@@ -5676,15 +5021,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if self.ephemeral_message_id and receiver_user_id is None:
-            receiver_user_id = self.from_user.id
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_photo(
             chat_id=self.chat.id,
             photo=photo,
@@ -5695,10 +5031,13 @@ class Message(Object, Update):
             show_caption_above_media=show_caption_above_media,
             ttl_seconds=ttl_seconds,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+            if self.ephemeral_message_id
+            else None,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -5720,8 +5059,6 @@ class Message(Object, Update):
         options: List[Union[str, "types.InputPollOption"]],
         description: Optional["types.FormattedText"] = None,
         description_media: Optional["types.InputPollMedia"] = None,
-        message_thread_id: Optional[int] = None,
-        business_connection_id: Optional[str] = None,
         is_anonymous: bool = True,
         type: "enums.PollType" = enums.PollType.REGULAR,
         allows_multiple_answers: Optional[bool] = None,
@@ -5741,7 +5078,6 @@ class Message(Object, Update):
         protect_content: Optional[bool] = None,
         allow_paid_broadcast: Optional[bool] = None,
         effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
         repeat_period: Optional[int] = None,
         paid_message_star_count: Optional[int] = None,
@@ -5779,13 +5115,6 @@ class Message(Object, Update):
 
             description_media (:obj:`~pyrogram.types.InputPollMedia`, *optional*):
                 Media attached to the poll.
-
-            message_thread_id (``int``, *optional*):
-                Unique identifier for the target message thread (topic) of the forum.
-                For supergroups only.
-
-            business_connection_id (``str``, *optional*):
-                Unique identifier of the business connection on behalf of which the message will be sent.
 
             is_anonymous (``bool``, *optional*):
                 True, if the poll needs to be anonymous.
@@ -5861,9 +5190,6 @@ class Message(Object, Update):
                 Unique identifier of the message effect.
                 For private chats only.
 
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
-
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
 
@@ -5884,22 +5210,14 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            reply_parameters = types.ReplyParameters(
-                message_id=self.id
-            )
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
         return await self._client.send_poll(
             chat_id=self.chat.id,
             question=question,
             options=options,
             description=description,
             description_media=description_media,
-            message_thread_id=message_thread_id,
-            business_connection_id=business_connection_id,
+            message_thread_id=self.message_thread_id,
+            business_connection_id=self.business_connection_id,
             is_anonymous=is_anonymous,
             type=type,
             allows_multiple_answers=allows_multiple_answers,
@@ -5919,7 +5237,7 @@ class Message(Object, Update):
             protect_content=protect_content,
             allow_paid_broadcast=allow_paid_broadcast,
             effect_id=effect_id,
-            reply_parameters=reply_parameters,
+            reply_parameters=types.ReplyParameters(message_id=self.id),
             schedule_date=schedule_date,
             repeat_period=repeat_period,
             paid_message_star_count=paid_message_star_count,
@@ -5932,8 +5250,6 @@ class Message(Object, Update):
         options: List[Union[str, "types.InputPollOption"]],
         description: Optional["types.FormattedText"] = None,
         description_media: Optional["types.InputPollMedia"] = None,
-        message_thread_id: Optional[int] = None,
-        business_connection_id: Optional[str] = None,
         is_anonymous: bool = True,
         type: "enums.PollType" = enums.PollType.REGULAR,
         allows_multiple_answers: Optional[bool] = None,
@@ -5991,13 +5307,6 @@ class Message(Object, Update):
             description_media (:obj:`~pyrogram.types.InputPollMedia`, *optional*):
                 Media attached to the poll.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier for the target message thread (topic) of the forum.
-                For supergroups only.
-
-            business_connection_id (``str``, *optional*):
-                Unique identifier of the business connection on behalf of which the message will be sent.
-
             is_anonymous (``bool``, *optional*):
                 True, if the poll needs to be anonymous.
                 Defaults to True.
@@ -6095,17 +5404,14 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
         return await self._client.send_poll(
             chat_id=self.chat.id,
             question=question,
             options=options,
             description=description,
             description_media=description_media,
-            message_thread_id=message_thread_id,
-            business_connection_id=business_connection_id,
+            message_thread_id=self.message_thread_id,
+            business_connection_id=self.business_connection_id,
             is_anonymous=is_anonymous,
             type=type,
             allows_multiple_answers=allows_multiple_answers,
@@ -6136,10 +5442,7 @@ class Message(Object, Update):
         self,
         emoji: str = "🎲",
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
         effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         suggested_post_parameters: Optional["types.SuggestedPostParameters"] = None,
         schedule_date: Optional[datetime] = None,
         protect_content: Optional[bool] = None,
@@ -6174,20 +5477,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier for the target message thread (topic) of the forum.
-                For supergroups only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.only.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             suggested_post_parameters (:obj:`~pyrogram.types.SuggestedPostParameters`, *optional*):
                 Information about the suggested post.
@@ -6215,22 +5507,14 @@ class Message(Object, Update):
             :obj:`~pyrogram.types.Message` | ``None``: On success, the sent dice message is returned, otherwise, in case
             the server answered with no message, None is returned.
         """
-        if reply_parameters is None:
-            reply_parameters = types.ReplyParameters(
-                message_id=self.id
-            )
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
         return await self._client.send_dice(
             chat_id=self.chat.id,
             emoji=emoji,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
             effect_id=effect_id,
-            reply_parameters=reply_parameters,
+            reply_parameters=types.ReplyParameters(message_id=self.id),
             suggested_post_parameters=suggested_post_parameters,
             schedule_date=schedule_date,
             protect_content=protect_content,
@@ -6244,8 +5528,6 @@ class Message(Object, Update):
         self,
         emoji: str = "🎲",
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         suggested_post_parameters: Optional["types.SuggestedPostParameters"] = None,
@@ -6281,14 +5563,6 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier for the target message thread (topic) of the forum.
-                For supergroups only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.only.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
@@ -6322,15 +5596,12 @@ class Message(Object, Update):
             :obj:`~pyrogram.types.Message` | ``None``: On success, the sent dice message is returned, otherwise, in case
             the server answered with no message, None is returned.
         """
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
         return await self._client.send_dice(
             chat_id=self.chat.id,
             emoji=emoji,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             suggested_post_parameters=suggested_post_parameters,
@@ -6350,12 +5621,7 @@ class Message(Object, Update):
         parse_mode: Optional["enums.ParseMode"] = None,
         caption_entities: Optional[List["types.MessageEntity"]] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
         repeat_period: Optional[int] = None,
         allow_paid_broadcast: Optional[bool] = None,
@@ -6371,11 +5637,6 @@ class Message(Object, Update):
         ] = None,
         progress: Optional[Callable] = None,
         progress_args: tuple = (),
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_sticker` will automatically fill method attributes:
 
@@ -6384,7 +5645,7 @@ class Message(Object, Update):
         * direct_messages_topic_id
         * business_connection_id
         * reply_parameters
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             sticker (``str``):
@@ -6410,29 +5671,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
@@ -6485,29 +5726,16 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            if self.ephemeral_message_id:
-                reply_parameters = types.ReplyParameters(
-                    ephemeral_message_id=self.ephemeral_message_id
-                )
-                receiver_user_id = receiver_user_id or self.from_user.id
-            else:
-                reply_parameters = types.ReplyParameters(message_id=self.id)
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
+        if self.ephemeral_message_id:
+            reply_parameters = types.ReplyParameters(
+                ephemeral_message_id=self.ephemeral_message_id
             )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
+            ephemeral_message_parameters = types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+        else:
+            reply_parameters = types.ReplyParameters(message_id=self.id)
+            ephemeral_message_parameters = None
 
         return await self._client.send_sticker(
             chat_id=self.chat.id,
@@ -6517,10 +5745,9 @@ class Message(Object, Update):
             parse_mode=parse_mode,
             caption_entities=caption_entities,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=ephemeral_message_parameters,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -6532,10 +5759,6 @@ class Message(Object, Update):
             reply_markup=reply_markup,
             progress=progress,
             progress_args=progress_args,
-
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            quote_entities=quote_entities,
         )
 
     async def answer_sticker(
@@ -6546,10 +5769,6 @@ class Message(Object, Update):
         parse_mode: Optional["enums.ParseMode"] = None,
         caption_entities: Optional[List["types.MessageEntity"]] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
@@ -6574,7 +5793,7 @@ class Message(Object, Update):
         * message_thread_id
         * direct_messages_topic_id
         * business_connection_id
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             sticker (``str``):
@@ -6599,23 +5818,6 @@ class Message(Object, Update):
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
                 Users will receive a notification with no sound.
-
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
 
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
@@ -6675,15 +5877,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if self.ephemeral_message_id and receiver_user_id is None:
-            receiver_user_id = self.from_user.id
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_sticker(
             chat_id=self.chat.id,
             sticker=sticker,
@@ -6692,10 +5885,13 @@ class Message(Object, Update):
             parse_mode=parse_mode,
             caption_entities=caption_entities,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+            if self.ephemeral_message_id
+            else None,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -6718,12 +5914,7 @@ class Message(Object, Update):
         foursquare_id: str = "",
         foursquare_type: str = "",
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: Optional[bool] = None,
         paid_message_star_count: Optional[int] = None,
         reply_markup: Optional[
@@ -6734,12 +5925,6 @@ class Message(Object, Update):
                 "types.ForceReply"
             ]
         ] = None,
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_venue` will automatically fill method attributes:
 
@@ -6748,7 +5933,7 @@ class Message(Object, Update):
         * direct_messages_topic_id
         * business_connection_id
         * reply_parameters
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             latitude (``float``):
@@ -6774,29 +5959,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             allow_paid_broadcast (``bool``, *optional*):
                 If True, you will be allowed to send up to 1000 messages per second.
@@ -6818,29 +5983,16 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            if self.ephemeral_message_id:
-                reply_parameters = types.ReplyParameters(
-                    ephemeral_message_id=self.ephemeral_message_id
-                )
-                receiver_user_id = receiver_user_id or self.from_user.id
-            else:
-                reply_parameters = types.ReplyParameters(message_id=self.id)
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
+        if self.ephemeral_message_id:
+            reply_parameters = types.ReplyParameters(
+                ephemeral_message_id=self.ephemeral_message_id
             )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
+            ephemeral_message_parameters = types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+        else:
+            reply_parameters = types.ReplyParameters(message_id=self.id)
+            ephemeral_message_parameters = None
 
         return await self._client.send_venue(
             chat_id=self.chat.id,
@@ -6851,21 +6003,15 @@ class Message(Object, Update):
             foursquare_id=foursquare_id,
             foursquare_type=foursquare_type,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=ephemeral_message_parameters,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             business_connection_id=self.business_connection_id,
             allow_paid_broadcast=allow_paid_broadcast,
             paid_message_star_count=paid_message_star_count,
             reply_markup=reply_markup,
-
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            parse_mode=parse_mode,
-            quote_entities=quote_entities,
         )
 
     async def answer_venue(
@@ -6877,10 +6023,6 @@ class Message(Object, Update):
         foursquare_id: str = "",
         foursquare_type: str = "",
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: Optional[bool] = None,
@@ -6900,7 +6042,7 @@ class Message(Object, Update):
         * message_thread_id
         * direct_messages_topic_id
         * business_connection_id
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             latitude (``float``):
@@ -6925,23 +6067,6 @@ class Message(Object, Update):
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
                 Users will receive a notification with no sound.
-
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
 
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
@@ -6970,15 +6095,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if self.ephemeral_message_id and receiver_user_id is None:
-            receiver_user_id = self.from_user.id
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_venue(
             chat_id=self.chat.id,
             latitude=latitude,
@@ -6988,10 +6104,13 @@ class Message(Object, Update):
             foursquare_id=foursquare_id,
             foursquare_type=foursquare_type,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+            if self.ephemeral_message_id
+            else None,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             business_connection_id=self.business_connection_id,
@@ -7018,12 +6137,7 @@ class Message(Object, Update):
         thumb: Optional[Union[str, BinaryIO]] = None,
         supports_streaming: bool = True,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
         repeat_period: Optional[int] = None,
         no_sound: Optional[bool] = None,
@@ -7040,11 +6154,6 @@ class Message(Object, Update):
         ] = None,
         progress: Optional[Callable] = None,
         progress_args: tuple = (),
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_video` will automatically fill method attributes:
 
@@ -7053,7 +6162,7 @@ class Message(Object, Update):
         * direct_messages_topic_id
         * business_connection_id
         * reply_parameters
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             video (``str``):
@@ -7119,29 +6228,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
@@ -7198,30 +6287,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            if self.ephemeral_message_id:
-                reply_parameters = types.ReplyParameters(
-                    ephemeral_message_id=self.ephemeral_message_id
-                )
-                receiver_user_id = receiver_user_id or self.from_user.id
-            else:
-                reply_parameters = types.ReplyParameters(message_id=self.id)
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
-            )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_video(
             chat_id=self.chat.id,
             video=video,
@@ -7240,12 +6305,15 @@ class Message(Object, Update):
             thumb=thumb,
             supports_streaming=supports_streaming,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+            if self.ephemeral_message_id
+            else None,
             effect_id=effect_id,
-            reply_parameters=reply_parameters,
+            reply_parameters=types.ReplyParameters(message_id=self.id),
             schedule_date=schedule_date,
             repeat_period=repeat_period,
             no_sound=no_sound,
@@ -7256,10 +6324,6 @@ class Message(Object, Update):
             reply_markup=reply_markup,
             progress=progress,
             progress_args=progress_args,
-
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            quote_entities=quote_entities,
         )
 
     async def answer_video(
@@ -7280,10 +6344,6 @@ class Message(Object, Update):
         thumb: Optional[Union[str, BinaryIO]] = None,
         supports_streaming: bool = True,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
@@ -7309,7 +6369,7 @@ class Message(Object, Update):
         * message_thread_id
         * direct_messages_topic_id
         * business_connection_id
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             video (``str``):
@@ -7375,23 +6435,6 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
@@ -7454,15 +6497,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if self.ephemeral_message_id and receiver_user_id is None:
-            receiver_user_id = self.from_user.id
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_video(
             chat_id=self.chat.id,
             video=video,
@@ -7481,10 +6515,13 @@ class Message(Object, Update):
             thumb=thumb,
             supports_streaming=supports_streaming,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+            if self.ephemeral_message_id
+            else None,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -7506,12 +6543,7 @@ class Message(Object, Update):
         length: int = 1,
         thumb: Optional[Union[str, BinaryIO]] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
         repeat_period: Optional[int] = None,
         protect_content: Optional[bool] = None,
@@ -7529,12 +6561,6 @@ class Message(Object, Update):
         ] = None,
         progress: Optional[Callable] = None,
         progress_args: tuple = (),
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_video_note` will automatically fill method attributes:
 
@@ -7543,7 +6569,7 @@ class Message(Object, Update):
         * direct_messages_topic_id
         * business_connection_id
         * reply_parameters
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             video_note (``str``):
@@ -7568,29 +6594,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
@@ -7650,29 +6656,16 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            if self.ephemeral_message_id:
-                reply_parameters = types.ReplyParameters(
-                    ephemeral_message_id=self.ephemeral_message_id
-                )
-                receiver_user_id = receiver_user_id or self.from_user.id
-            else:
-                reply_parameters = types.ReplyParameters(message_id=self.id)
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
+        if self.ephemeral_message_id:
+            reply_parameters = types.ReplyParameters(
+                ephemeral_message_id=self.ephemeral_message_id
             )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
+            ephemeral_message_parameters = types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+        else:
+            reply_parameters = types.ReplyParameters(message_id=self.id)
+            ephemeral_message_parameters = None
 
         return await self._client.send_video_note(
             chat_id=self.chat.id,
@@ -7681,10 +6674,9 @@ class Message(Object, Update):
             length=length,
             thumb=thumb,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=ephemeral_message_parameters,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -7698,11 +6690,6 @@ class Message(Object, Update):
             reply_markup=reply_markup,
             progress=progress,
             progress_args=progress_args,
-
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            parse_mode=parse_mode,
-            quote_entities=quote_entities,
         )
 
     async def answer_video_note(
@@ -7712,10 +6699,6 @@ class Message(Object, Update):
         length: int = 1,
         thumb: Optional[Union[str, BinaryIO]] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
@@ -7742,7 +6725,7 @@ class Message(Object, Update):
         * message_thread_id
         * direct_messages_topic_id
         * business_connection_id
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             video_note (``str``):
@@ -7766,23 +6749,6 @@ class Message(Object, Update):
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
                 Users will receive a notification with no sound.
-
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
 
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
@@ -7849,15 +6815,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if self.ephemeral_message_id and receiver_user_id is None:
-            receiver_user_id = self.from_user.id
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_video_note(
             chat_id=self.chat.id,
             video_note=video_note,
@@ -7865,10 +6822,13 @@ class Message(Object, Update):
             length=length,
             thumb=thumb,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+            if self.ephemeral_message_id
+            else None,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -7892,12 +6852,7 @@ class Message(Object, Update):
         caption_entities: Optional[List["types.MessageEntity"]] = None,
         duration: int = 0,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
         repeat_period: Optional[int] = None,
         view_once: Optional[bool] = None,
@@ -7914,11 +6869,6 @@ class Message(Object, Update):
         ] = None,
         progress: Optional[Callable] = None,
         progress_args: tuple = (),
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_voice` will automatically fill method attributes:
 
@@ -7927,7 +6877,7 @@ class Message(Object, Update):
         * direct_messages_topic_id
         * business_connection_id
         * reply_parameters
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             voice (``str``):
@@ -7953,29 +6903,9 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
@@ -8032,29 +6962,16 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            if self.ephemeral_message_id:
-                reply_parameters = types.ReplyParameters(
-                    ephemeral_message_id=self.ephemeral_message_id
-                )
-                receiver_user_id = receiver_user_id or self.from_user.id
-            else:
-                reply_parameters = types.ReplyParameters(message_id=self.id)
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
+        if self.ephemeral_message_id:
+            reply_parameters = types.ReplyParameters(
+                ephemeral_message_id=self.ephemeral_message_id
             )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
+            ephemeral_message_parameters = types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+        else:
+            reply_parameters = types.ReplyParameters(message_id=self.id)
+            ephemeral_message_parameters = None
 
         return await self._client.send_voice(
             chat_id=self.chat.id,
@@ -8064,10 +6981,9 @@ class Message(Object, Update):
             caption_entities=caption_entities,
             duration=duration,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=ephemeral_message_parameters,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -8080,10 +6996,6 @@ class Message(Object, Update):
             reply_markup=reply_markup,
             progress=progress,
             progress_args=progress_args,
-
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            quote_entities=quote_entities,
         )
 
     async def answer_voice(
@@ -8094,10 +7006,6 @@ class Message(Object, Update):
         caption_entities: Optional[List["types.MessageEntity"]] = None,
         duration: int = 0,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        receiver_user_id: Optional[Union[int, str]] = None,
-        callback_query_id: Optional[str] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
@@ -8123,7 +7031,7 @@ class Message(Object, Update):
         * message_thread_id
         * direct_messages_topic_id
         * business_connection_id
-        * receiver_user_id
+        * ephemeral_message_id
 
         Parameters:
             voice (``str``):
@@ -8148,27 +7056,6 @@ class Message(Object, Update):
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
                 Users will receive a notification with no sound.
-
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            receiver_user_id (``int`` | ``str``, *optional*):
-                For outgoing ephemeral messages, unique identifier (int) or username (str) of the user who will receive the message.
-                For group and supergroup chats only.
-                It is not guaranteed that the user will receive the message, especially if they are offline.
-                See `ephemeral message sending <https://core.telegram.org/bots/api#ephemeral-messages-and-commands>`__ for more details.
-
-            callback_query_id (``str``, *optional*):
-                For outgoing ephemeral messages, identifier of the callback query which triggered the message if any.
-
-            effect_id (``int``, *optional*):
-                Unique identifier of the message effect.
-                For private chats only.
 
             reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
                 Describes reply parameters for the message that is being sent.
@@ -8228,15 +7115,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if self.ephemeral_message_id and receiver_user_id is None:
-            receiver_user_id = self.from_user.id
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_voice(
             chat_id=self.chat.id,
             voice=voice,
@@ -8245,10 +7123,13 @@ class Message(Object, Update):
             caption_entities=caption_entities,
             duration=duration,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            receiver_user_id=receiver_user_id,
-            callback_query_id=callback_query_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            ephemeral_message_parameters=types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+            if self.ephemeral_message_id
+            else None,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -8277,8 +7158,6 @@ class Message(Object, Update):
         parse_mode: Optional["enums.ParseMode"] = None,
         caption_entities: Optional[List["types.MessageEntity"]] = None,
         disable_notification: Optional[bool] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         suggested_post_parameters: Optional["types.SuggestedPostParameters"] = None,
         schedule_date: Optional[datetime] = None,
         protect_content: Optional[bool] = None,
@@ -8312,13 +7191,6 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
-
             suggested_post_parameters (:obj:`~pyrogram.types.SuggestedPostParameters`, *optional*):
                 Information about the suggested post.
 
@@ -8334,14 +7206,6 @@ class Message(Object, Update):
         Returns:
             List of :obj:`~pyrogram.types.Message`: On success, a list of messages is returned.
         """
-        if reply_parameters is None:
-            reply_parameters = types.ReplyParameters(
-                message_id=self.id
-            )
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_paid_media(
             chat_id=self.chat.id,
             stars_amount=stars_amount,
@@ -8351,8 +7215,8 @@ class Message(Object, Update):
             parse_mode=parse_mode,
             caption_entities=caption_entities,
             disable_notification=disable_notification,
-            direct_messages_topic_id=direct_messages_topic_id,
-            reply_parameters=reply_parameters,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            reply_parameters=types.ReplyParameters(message_id=self.id),
             suggested_post_parameters=suggested_post_parameters,
             schedule_date=schedule_date,
             protect_content=protect_content,
@@ -8374,7 +7238,6 @@ class Message(Object, Update):
         parse_mode: Optional["enums.ParseMode"] = None,
         caption_entities: Optional[List["types.MessageEntity"]] = None,
         disable_notification: Optional[bool] = None,
-        direct_messages_topic_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         suggested_post_parameters: Optional["types.SuggestedPostParameters"] = None,
         schedule_date: Optional[datetime] = None,
@@ -8409,10 +7272,6 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.only.
-
             reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
                 Describes reply parameters for the message that is being sent.
 
@@ -8431,9 +7290,6 @@ class Message(Object, Update):
         Returns:
             List of :obj:`~pyrogram.types.Message`: On success, a list of messages is returned.
         """
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_paid_media(
             chat_id=self.chat.id,
             stars_amount=stars_amount,
@@ -8443,7 +7299,7 @@ class Message(Object, Update):
             parse_mode=parse_mode,
             caption_entities=caption_entities,
             disable_notification=disable_notification,
-            direct_messages_topic_id=direct_messages_topic_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
             reply_parameters=reply_parameters,
             suggested_post_parameters=suggested_post_parameters,
             schedule_date=schedule_date,
@@ -8459,9 +7315,6 @@ class Message(Object, Update):
         parse_mode: Optional["enums.ParseMode"] = None,
         caption_entities: Optional[List["types.MessageEntity"]] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: Optional[bool] = None,
         paid_message_star_count: Optional[int] = None,
         suggested_post_parameters: Optional["types.SuggestedPostParameters"] = None,
@@ -8473,11 +7326,6 @@ class Message(Object, Update):
                 "types.ForceReply"
             ]
         ] = None,
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_cached_media` will automatically fill method attributes:
 
@@ -8506,17 +7354,6 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
-
             allow_paid_broadcast (``bool``, *optional*):
                 If True, you will be allowed to send up to 1000 messages per second.
                 Ignoring broadcasting limits for a fee of 0.1 Telegram Stars per message.
@@ -8540,26 +7377,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            reply_parameters = types.ReplyParameters(
-                message_id=self.id
-            )
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
-            )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_cached_media(
             chat_id=self.chat.id,
             file_id=file_id,
@@ -8567,18 +7384,14 @@ class Message(Object, Update):
             parse_mode=parse_mode,
             caption_entities=caption_entities,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            reply_parameters=reply_parameters,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            reply_parameters=types.ReplyParameters(message_id=self.id),
             business_connection_id=self.business_connection_id,
             allow_paid_broadcast=allow_paid_broadcast,
             paid_message_star_count=paid_message_star_count,
             suggested_post_parameters=suggested_post_parameters,
             reply_markup=reply_markup,
-
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            quote_entities=quote_entities,
         )
 
     async def answer_cached_media(
@@ -8588,8 +7401,6 @@ class Message(Object, Update):
         parse_mode: Optional["enums.ParseMode"] = None,
         caption_entities: Optional[List["types.MessageEntity"]] = None,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
-        direct_messages_topic_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         allow_paid_broadcast: Optional[bool] = None,
         paid_message_star_count: Optional[int] = None,
@@ -8629,14 +7440,6 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
             reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
                 Describes reply parameters for the message that is being sent.
 
@@ -8663,12 +7466,6 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_cached_media(
             chat_id=self.chat.id,
             file_id=file_id,
@@ -8676,8 +7473,8 @@ class Message(Object, Update):
             parse_mode=parse_mode,
             caption_entities=caption_entities,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
             reply_parameters=reply_parameters,
             business_connection_id=self.business_connection_id,
             allow_paid_broadcast=allow_paid_broadcast,
@@ -8734,16 +7531,7 @@ class Message(Object, Update):
         query_id: int,
         result_id: str,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[bool] = None,
-        direct_messages_topic_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         paid_message_star_count: Optional[int] = None,
-
-        quote: Optional[bool] = None,
-        reply_to_message_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_inline_bot_result` will automatically fill method attributes:
 
@@ -8763,17 +7551,6 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
-
             paid_message_star_count (``int``, *optional*):
                 The number of Telegram Stars the user agreed to pay to send the messages.
 
@@ -8784,40 +7561,15 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            reply_parameters = types.ReplyParameters(
-                message_id=self.id
-            )
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
-            )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_inline_bot_result(
             chat_id=self.chat.id,
             query_id=query_id,
             result_id=result_id,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
-            reply_parameters=reply_parameters,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
+            reply_parameters=types.ReplyParameters(message_id=self.id),
             paid_message_star_count=paid_message_star_count,
-
-            reply_to_message_id=reply_to_message_id,
-            quote_text=quote_text,
-            parse_mode=parse_mode,
-            quote_entities=quote_entities,
         )
 
     async def answer_inline_bot_result(
@@ -8825,8 +7577,6 @@ class Message(Object, Update):
         query_id: int,
         result_id: str,
         disable_notification: Optional[bool] = None,
-        message_thread_id: Optional[bool] = None,
-        direct_messages_topic_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         paid_message_star_count: Optional[int] = None
     ) -> Optional["Message"]:
@@ -8847,14 +7597,6 @@ class Message(Object, Update):
                 Sends the message silently.
                 Users will receive a notification with no sound.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier of a message thread to which the message belongs.
-                For forums only.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.
-
             reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
                 Describes reply parameters for the message that is being sent.
 
@@ -8868,19 +7610,13 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
-        if direct_messages_topic_id is None:
-            direct_messages_topic_id = self.direct_messages_topic_id
-
         return await self._client.send_inline_bot_result(
             chat_id=self.chat.id,
             query_id=query_id,
             result_id=result_id,
             disable_notification=disable_notification,
-            message_thread_id=message_thread_id,
-            direct_messages_topic_id=direct_messages_topic_id,
+            message_thread_id=self.message_thread_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
             reply_parameters=reply_parameters,
             paid_message_star_count=paid_message_star_count
         )
@@ -8890,9 +7626,7 @@ class Message(Object, Update):
         checklist: "types.InputChecklist",
         disable_notification: Optional[bool] = None,
         protect_content: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
         effect_id: Optional[int] = None,
-        reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
         repeat_period: Optional[int] = None,
         paid_message_star_count: Optional[int] = None,
@@ -8904,8 +7638,6 @@ class Message(Object, Update):
                 "types.ForceReply"
             ]
         ] = None,
-
-        quote: Optional[bool] = None,
     ) -> Optional["Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.send_checklist` will automatically fill method attributes:
 
@@ -8933,16 +7665,9 @@ class Message(Object, Update):
             protect_content (``bool``, *optional*):
                 Protects the contents of the sent message from forwarding and saving.
 
-            message_thread_id (``int``, *optional*):
-                Unique identifier for the target message thread (topic) of the forum.
-                For supergroups only.
-
             effect_id (``int``, *optional*):
                 Unique identifier of the message effect.
                 For private chats only.
-
-            reply_parameters (:obj:`~pyrogram.types.ReplyParameters`, *optional*):
-                Describes reply parameters for the message that is being sent.
 
             schedule_date (:py:obj:`~datetime.datetime`, *optional*):
                 Date when the message will be automatically sent.
@@ -8964,31 +7689,14 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if reply_parameters is None:
-            reply_parameters = types.ReplyParameters(
-                message_id=self.id
-            )
-
-        if quote is not None:
-            log.warning(
-                "`quote` parameter is deprecated and will be removed in future updates."
-            )
-            quote = self.chat.type != enums.ChatType.PRIVATE
-
-            if not quote:
-                reply_parameters = None
-
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
         return await self._client.send_checklist(
             chat_id=self.chat.id,
             checklist=checklist,
             disable_notification=disable_notification,
             protect_content=protect_content,
-            message_thread_id=message_thread_id,
+            message_thread_id=self.message_thread_id,
             effect_id=effect_id,
-            reply_parameters=reply_parameters,
+            reply_parameters=types.ReplyParameters(message_id=self.id),
             schedule_date=schedule_date,
             repeat_period=repeat_period,
             business_connection_id=self.business_connection_id,
@@ -9001,7 +7709,6 @@ class Message(Object, Update):
         checklist: "types.InputChecklist",
         disable_notification: Optional[bool] = None,
         protect_content: Optional[bool] = None,
-        message_thread_id: Optional[int] = None,
         effect_id: Optional[int] = None,
         reply_parameters: Optional["types.ReplyParameters"] = None,
         schedule_date: Optional[datetime] = None,
@@ -9072,15 +7779,12 @@ class Message(Object, Update):
         Raises:
             RPCError: In case of a Telegram RPC error.
         """
-        if message_thread_id is None:
-            message_thread_id = self.message_thread_id
-
         return await self._client.send_checklist(
             chat_id=self.chat.id,
             checklist=checklist,
             disable_notification=disable_notification,
             protect_content=protect_content,
-            message_thread_id=message_thread_id,
+            message_thread_id=self.message_thread_id,
             effect_id=effect_id,
             reply_parameters=reply_parameters,
             schedule_date=schedule_date,
@@ -9093,7 +7797,6 @@ class Message(Object, Update):
     async def reply_rich(
         self,
         rich_message: "types.InputRichMessage",
-        direct_messages_topic_id: Optional[int] = None,
         disable_notification: Optional[bool] = None,
         protect_content: Optional[bool] = None,
         allow_paid_broadcast: Optional[bool] = None,
@@ -9112,17 +7815,14 @@ class Message(Object, Update):
 
         * chat_id
         * message_thread_id
+        * direct_messages_topic_id
         * business_connection_id
         * reply_parameters
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             rich_message (:obj:`~pyrogram.types.InputChecklist`):
                 The message to be sent.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.only.
 
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
@@ -9165,7 +7865,7 @@ class Message(Object, Update):
         return await self._client.send_rich_message(
             chat_id=self.chat.id,
             rich_message=rich_message,
-            direct_messages_topic_id=direct_messages_topic_id or self.direct_messages_topic_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
             disable_notification=disable_notification,
             message_thread_id=self.message_thread_id,
             protect_content=protect_content,
@@ -9180,7 +7880,6 @@ class Message(Object, Update):
     async def answer_rich(
         self,
         rich_message: "types.InputRichMessage",
-        direct_messages_topic_id: Optional[int] = None,
         disable_notification: Optional[bool] = None,
         protect_content: Optional[bool] = None,
         allow_paid_broadcast: Optional[bool] = None,
@@ -9199,16 +7898,13 @@ class Message(Object, Update):
 
         * chat_id
         * message_thread_id
+        * direct_messages_topic_id
         * business_connection_id
-        * receiver_user_id
+        * ephemeral_message_parameters
 
         Parameters:
             rich_message (:obj:`~pyrogram.types.InputChecklist`):
                 The message to be sent.
-
-            direct_messages_topic_id (``int``, *optional*):
-                Unique identifier of the topic in a channel direct messages chat administered by the current user.
-                For direct chats only.only.
 
             disable_notification (``bool``, *optional*):
                 Sends the message silently.
@@ -9244,27 +7940,29 @@ class Message(Object, Update):
         return await self._client.send_rich_message(
             chat_id=self.chat.id,
             rich_message=rich_message,
-            direct_messages_topic_id=direct_messages_topic_id or self.direct_messages_topic_id,
+            direct_messages_topic_id=self.direct_messages_topic_id,
             disable_notification=disable_notification,
             message_thread_id=self.message_thread_id,
             protect_content=protect_content,
             allow_paid_broadcast=allow_paid_broadcast,
             effect_id=effect_id,
             suggested_post_parameters=suggested_post_parameters,
-            receiver_user_id=self.from_user.id if self.ephemeral_message_id else None,
+            ephemeral_message_parameters=types.EphemeralMessageParameters(
+                receiver_user_id=self.from_user.id
+            )
+            if self.ephemeral_message_id
+            else None,
             reply_markup=reply_markup,
         )
 
     async def edit_text(
         self,
-        text: str,
+        text: Optional[str] = None,
         parse_mode: Optional["enums.ParseMode"] = None,
         entities: Optional[List["types.MessageEntity"]] = None,
         link_preview_options: Optional["types.LinkPreviewOptions"] = None,
         reply_markup: Optional["types.InlineKeyboardMarkup"] = None,
-
-        show_caption_above_media: Optional[bool] = None,
-        disable_web_page_preview: Optional[bool] = None,
+        rich_message: Optional["types.InputRichMessage"] = None,
     ) -> "Message":
         """Shortcut for method :obj:`~pyrogram.Client.edit_message_text` will automatically fill method attributes:
 
@@ -9280,6 +7978,7 @@ class Message(Object, Update):
         Parameters:
             text (``str``):
                 New text of the message.
+                Required if ``rich_message`` isn't specified.
 
             parse_mode (:obj:`~pyrogram.enums.ParseMode`, *optional*):
                 By default, texts are parsed using both Markdown and HTML styles.
@@ -9293,6 +7992,10 @@ class Message(Object, Update):
 
             reply_markup (:obj:`~pyrogram.types.InlineKeyboardMarkup`, *optional*):
                 An InlineKeyboardMarkup object.
+
+            rich_message (:obj:`~pyrogram.types.InputRichMessage`, *optional*):
+                New rich content of the message.
+                Required if ``text`` isn't specified.
 
         Returns:
             On success, the edited :obj:`~pyrogram.types.Message` is returned.
@@ -9309,9 +8012,7 @@ class Message(Object, Update):
             link_preview_options=link_preview_options,
             business_connection_id=self.business_connection_id,
             reply_markup=reply_markup,
-
-            show_caption_above_media=show_caption_above_media,
-            disable_web_page_preview=disable_web_page_preview,
+            rich_message=rich_message,
         )
 
     edit = edit_text
@@ -9885,14 +8586,6 @@ class Message(Object, Update):
         show_caption_above_media: Optional[bool] = None,
         allow_paid_broadcast: Optional[bool] = None,
         paid_message_star_count: Optional[int] = None,
-
-        reply_to_message_id: Optional[int] = None,
-        reply_to_chat_id: Optional[Union[int, str]] = None,
-        reply_to_story_id: Optional[int] = None,
-        quote_text: Optional[str] = None,
-        parse_mode: Optional["enums.ParseMode"] = None,
-        quote_entities: Optional[List["types.MessageEntity"]] = None,
-        quote_offset: Optional[int] = None,
     ) -> List["types.Message"]:
         """Shortcut for method :obj:`~pyrogram.Client.copy_media_group` will automatically fill method attributes:
 
@@ -9956,14 +8649,6 @@ class Message(Object, Update):
             show_caption_above_media=show_caption_above_media,
             allow_paid_broadcast=allow_paid_broadcast,
             paid_message_star_count=paid_message_star_count,
-
-            reply_to_message_id=reply_to_message_id,
-            reply_to_chat_id=reply_to_chat_id,
-            reply_to_story_id=reply_to_story_id,
-            quote_text=quote_text,
-            parse_mode=parse_mode,
-            quote_entities=quote_entities,
-            quote_offset=quote_offset,
         )
 
     async def delete(self, revoke: bool = True):
@@ -9990,7 +8675,7 @@ class Message(Object, Update):
         if self.ephemeral_message_id:
             r = await self._client.delete_ephemeral_message(
                 chat_id=self.chat.id,
-                receiver_user_id=self.receiver_user.id,
+                receiver_user_id=self.from_user.id,
                 ephemeral_message_id=self.ephemeral_message_id
             )
         else:
@@ -10110,12 +8795,12 @@ class Message(Object, Update):
             label = x.encode("utf-16", "surrogatepass").decode("utf-16")
 
             try:
-                button = [
+                button = next(
                     button
                     for row in keyboard
                     for button in row
                     if label == button.text
-                ][0]
+                )
             except IndexError:
                 raise ValueError(f"The button with label '{x}' doesn't exists")
         else:
@@ -10178,14 +8863,13 @@ class Message(Object, Update):
             elif button.switch_inline_query_current_chat:
                 return button.switch_inline_query_current_chat
             elif button.copy_text:
-                return button.copy_text
+                return button.copy_text.text
             else:
                 raise ValueError("This button is not supported yet")
+        elif quote:
+            await self.reply(text=button)
         else:
-            if quote:
-                await self.reply(text=button)
-            else:
-                await self.answer(text=button)
+            await self.answer(text=button)
 
     async def react(
         self,

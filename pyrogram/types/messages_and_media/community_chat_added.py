@@ -32,7 +32,7 @@ class CommunityChatAdded(Object):
             The new community to which the chat belongs.
     """
 
-    def __init__(self, *, community: "types.ChecklistTask"):
+    def __init__(self, *, community: "types.Community"):
         super().__init__()
 
         self.community = community
