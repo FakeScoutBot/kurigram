@@ -200,6 +200,12 @@ class Client(Methods):
             Set the global parse mode of the client. By default, texts are parsed using both Markdown and HTML styles.
             You can combine both syntaxes together.
 
+        prefixes (``str`` | ``list`` of ``str``, *optional*):
+            Set the global command prefixes of the client, e.g.: *prefixes=["/", "!"]*.
+            :obj:`~pyrogram.filters.command` filters that don't specify their own *prefixes* follow this value.
+            Pass None or an empty string to accept commands with no prefix at all.
+            Defaults to "/" (slash).
+
         no_updates (``bool``, *optional*):
             Pass True to disable incoming updates.
             When updates are disabled the client can't receive messages or other updates.
@@ -341,6 +347,7 @@ class Client(Methods):
         workdir: PathType = WORKDIR,
         plugins: dict | None = None,
         parse_mode: enums.ParseMode = enums.ParseMode.DEFAULT,
+        prefixes: str | list[str] | None = "/",
         no_updates: bool | None = None,
         skip_updates: bool = True,
         takeout: bool | None = None,
@@ -385,6 +392,7 @@ class Client(Methods):
         self.workdir = Path(workdir)
         self.plugins = plugins
         self.parse_mode = parse_mode
+        self.prefixes = utils.normalize_prefixes(prefixes)
         self.no_updates = no_updates
         self.skip_updates = skip_updates
         self.takeout = takeout
@@ -825,6 +833,32 @@ class Client(Methods):
         """
 
         self.parse_mode = parse_mode
+
+    def set_prefixes(self, prefixes: str | list[str] | None):
+        """Set the command prefixes to be used globally by the client.
+
+        When setting the prefixes with this method, all :obj:`~pyrogram.filters.command` filters that don't
+        specify their own *prefixes* will follow the global value.
+
+        Parameters:
+            prefixes (``str`` | ``list`` of ``str``, *optional*):
+                A prefix or a list of prefixes as string.
+                Pass None or an empty string to accept commands with no prefix at all.
+
+        Example:
+            .. code-block:: python
+
+                # Accept both /start and !start
+                app.set_prefixes(["/", "!"])
+
+                # Accept only .start
+                app.set_prefixes(".")
+
+                # Accept commands with no prefix at all
+                app.set_prefixes(None)
+        """
+
+        self.prefixes = utils.normalize_prefixes(prefixes)
 
     async def fetch_peers(self, peers: list[raw.base.User | raw.base.Chat]) -> bool:
         is_min = False

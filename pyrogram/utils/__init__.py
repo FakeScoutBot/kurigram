@@ -55,6 +55,7 @@ from .peers import (
     get_peer_type,
     get_raw_peer_id,
 )
+from .prefixes import normalize_prefixes
 from .text import get_first_url, parse_text_entities, parse_text_with_entities, split_text
 
 __all__ = [
@@ -90,6 +91,7 @@ __all__ = [
     "get_reply_to",
     "itob",
     "jsonvalue_to_obj",
+    "normalize_prefixes",
     "max_datetime",
     "obj_to_jsonvalue",
     "pack_inline_message_id",

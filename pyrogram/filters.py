@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any, Final, cast
 
 import pyrogram
 from pyrogram import enums
+from pyrogram.utils import normalize_prefixes
 from pyrogram.types import (
     BusinessConnection,
     CallbackQuery,
@@ -1194,8 +1195,14 @@ ephemeral = create(lambda _, __, message: message.ephemeral_message_id is not No
 
 
 # region command_filter
+_CLIENT_PREFIXES: Final = object()
+"""Sentinel: follow the global ``prefixes`` of the client the filter runs on."""
+
+
 def command(
-    commands: str | list[str], prefixes: str | list[str] | None = "/", case_sensitive: bool = False
+    commands: str | list[str],
+    prefixes: str | list[str] | None = _CLIENT_PREFIXES,  # type: ignore[assignment]
+    case_sensitive: bool = False,
 ) -> Filter:
     """Filter commands, i.e.: text messages starting with "/" or any other custom prefix.
 
@@ -1208,7 +1215,8 @@ def command(
 
         prefixes (``str`` | ``list``, *optional*):
             A prefix or a list of prefixes as string the filter should look for.
-            Defaults to "/" (slash). Examples: ".", "!", ["/", "!", "."], list(".:!").
+            Defaults to the global ``prefixes`` of the client (which is "/" unless changed).
+            Examples: ".", "!", ["/", "!", "."], list(".:!").
             Pass None or "" (empty string) to allow commands with no prefix at all.
 
         case_sensitive (``bool``, *optional*):
@@ -1225,7 +1233,9 @@ def command(
         if not text:
             return False
 
-        for prefix in flt.prefixes:
+        prefixes = client.prefixes if flt.prefixes is None else flt.prefixes
+
+        for prefix in prefixes:
             if not text.startswith(prefix):
                 continue
 
@@ -1265,12 +1275,11 @@ def command(
     commands = commands if isinstance(commands, list) else [commands]
     commands = {c if case_sensitive else c.lower() for c in commands}
 
-    prefixes = [] if prefixes is None else prefixes
-    prefixes = prefixes if isinstance(prefixes, list) else [prefixes]
-    prefixes = set(prefixes) if prefixes else {""}
+    # flt.prefixes is None only when the user didn't pass any: an explicit None/"" becomes {""}
+    resolved = None if prefixes is _CLIENT_PREFIXES else set(normalize_prefixes(prefixes))
 
     return create(
-        func, "CommandFilter", commands=commands, prefixes=prefixes, case_sensitive=case_sensitive
+        func, "CommandFilter", commands=commands, prefixes=resolved, case_sensitive=case_sensitive
     )
 
 
